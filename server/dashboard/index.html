@@ -16,6 +16,8 @@
   header button:hover { background: #eee; }
   header .conn { font-size: 12px; color: var(--dim); }
   header .conn.off { color: var(--bad); font-weight: 700; }
+  header .icon-btn { font-size: 16px; padding: 6px 10px; border-radius: 6px; border: 1px solid transparent; background: transparent; line-height: 1; color: var(--dim); }
+  header .icon-btn:hover { background: #eee; }
 
   /* 프롬프트 모음 패널 (결정 26) — 오른쪽 슬라이드오버, 뒤 대시보드를 가리지 않음 */
   .prompts {
@@ -98,10 +100,10 @@
   <header>
     <h1>🧪 가상 실험실</h1>
     <span class="batch" id="batchLabel">—</span>
-    <span class="conn" id="connLabel">연결 중…</span>
-    <button id="promptsBtn">프롬프트 모음</button>
+    <span class="conn" id="connLabel"></span>
     <button id="nextBatchBtn">다음 배치 투입</button>
     <button id="resetBtn">리셋</button>
+    <button class="icon-btn" id="promptsBtn" aria-label="프롬프트 모음">☰</button>
   </header>
 
   <div class="prompts" id="promptsPanel">
@@ -251,7 +253,7 @@ function renderMain(state) {
 
   if (mode === 'plate') {
     el('mainTitle').textContent = '플레이트';
-    el('mainDetail').textContent = `${state.batch} · lot #${state.lot} · 샘플 12 × 3반복`;
+    el('mainDetail').textContent = `${state.batch} · 샘플 12 × 3반복`;
     renderPlate(state);
   } else if (mode === 'curves') {
     el('mainTitle').textContent = '증폭 곡선';
@@ -259,7 +261,7 @@ function renderMain(state) {
     renderCurves(state);
   } else {
     el('mainTitle').textContent = '결과표';
-    el('mainDetail').textContent = `측정 완료 · ${state.batch} · lot #${state.lot}`;
+    el('mainDetail').textContent = `측정 완료 · ${state.batch}`;
     renderResults(state);
   }
 }
@@ -427,7 +429,7 @@ function ensurePolling(state) {
 // ---- 상태 적용 ----
 function applyState(state) {
   lastState = state;
-  el('batchLabel').textContent = `${state.batch} · lot #${state.lot}`;
+  el('batchLabel').textContent = state.batch;
   renderDevices(state);
   renderMain(state);
   ensurePolling(state);
@@ -443,8 +445,8 @@ async function fetchState(withTrace) {
 // ---- SSE ----
 function connect() {
   const es = new EventSource('/events');
-  es.addEventListener('open', () => { el('connLabel').textContent = '● 실시간 연결됨'; el('connLabel').classList.remove('off'); });
-  es.addEventListener('error', () => { el('connLabel').textContent = '● 연결 끊김 — 재시도 중'; el('connLabel').classList.add('off'); });
+  es.addEventListener('open', () => { el('connLabel').textContent = ''; el('connLabel').classList.remove('off'); });
+  es.addEventListener('error', () => { el('connLabel').textContent = '● 연결 끊김'; el('connLabel').classList.add('off'); });
   es.addEventListener('state', (e) => applyState(JSON.parse(e.data)));
   es.addEventListener('trace', (e) => {
     const ev = JSON.parse(e.data);

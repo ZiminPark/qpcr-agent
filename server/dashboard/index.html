@@ -88,6 +88,12 @@
   #curveWrap { height: 280px; }
   #curveWrap canvas { width:100% !important; height:100% !important; }
   #curveEmpty { color: var(--dim); font-size: 14px; padding: 40px 0; text-align: center; }
+  /* 런 진행 바 (결정 30 시각화 ③) */
+  .curve-progress-row { display:flex; align-items:center; gap:10px; margin-top:10px; font-size:13px; color:var(--dim); }
+  .curve-progress-track { flex:1; height:6px; background:#eee; border-radius:3px; overflow:hidden; }
+  .curve-progress-fill { height:100%; width:0%; background:var(--fill); border-radius:3px; transition:width .3s linear; }
+  .curve-progress-text { white-space:nowrap; }
+  .curve-threshold-note { font-size:12px; color:var(--dim); margin-top:6px; } /* 결정 30 시각화 ② 설명 */
 
   /* 플레이트 그리드 */
   table.plate { border-collapse:collapse; margin:0 auto; }
@@ -165,29 +171,44 @@
 
   <div class="devices" id="devices"></div>
 
-  <h2 class="main-title"><span id="mainTitle">플레이트</span></h2>
+  <!-- 결정 30: 모드 전환 폐지 — 플레이트·증폭 곡선·결과표를 각자 독립 섹션으로 병렬 표시 -->
+  <h2 class="main-title">플레이트</h2>
   <div class="main">
     <div class="main-sub">
-      <span id="mainDetail">—</span>
+      <span id="plateDetail">—</span>
     </div>
+    <table class="plate" id="plateTable"></table>
+    <div class="legend">
+      <span class="sw" style="background:#fff"></span> 비어있음
+      <span class="sw" style="background:#cfe0f5"></span> 채워짐
+      <span class="sw" style="background:#cfeadd"></span> 측정완료
+      <span class="sw" style="background:#f5c9c9"></span> 이상 (Agent 판정)
+      &nbsp;·&nbsp; 열 = 샘플(S01~S12), 행 A·B·C = 3반복
+    </div>
+  </div>
 
-    <div id="viewPlate">
-      <table class="plate" id="plateTable"></table>
-      <div class="legend">
-        <span class="sw" style="background:#fff"></span> 비어있음
-        <span class="sw" style="background:#cfe0f5"></span> 채워짐
-        <span class="sw" style="background:#cfeadd"></span> 측정완료
-        <span class="sw" style="background:#f5c9c9"></span> 이상 (Agent 판정)
-        &nbsp;·&nbsp; 열 = 샘플(S01~S12), 행 A·B·C = 3반복
+  <div id="curvesSection" style="display:none">
+    <h2 class="main-title">증폭 곡선</h2>
+    <div class="main">
+      <div class="main-sub">
+        <span id="curvesDetail">—</span>
       </div>
-    </div>
-
-    <div id="viewCurves" style="display:none">
       <div id="curveWrap"><canvas id="curveCanvas"></canvas></div>
       <div id="curveEmpty" style="display:none">런 시작 대기 중…</div>
+      <div class="curve-progress-row">
+        <div class="curve-progress-track"><div class="curve-progress-fill" id="curveProgressFill"></div></div>
+        <span class="curve-progress-text" id="curveProgressText">—</span>
+      </div>
+      <div class="curve-threshold-note">임계값 0.2 — 이 선을 넘는 시점이 Cq</div>
     </div>
+  </div>
 
-    <div id="viewResults" style="display:none">
+  <div id="resultsSection" style="display:none">
+    <h2 class="main-title">결과표</h2>
+    <div class="main">
+      <div class="main-sub">
+        <span id="resultsDetail">—</span>
+      </div>
       <table class="results" id="resultsTable"></table>
       <div class="legend">
         <span class="sw" style="background:#eaf7f0"></span> 정상
@@ -298,35 +319,20 @@ function renderDevices(state) {
   });
 }
 
-// ---- 메인 뷰 모드 ----
-function computeMode(state) {
-  if (!state.qpcr_run) return 'plate';
-  return state.qpcr_run.running ? 'curves' : 'results';
+// ---- 메인 섹션 (결정 30: 모드 전환 폐지 — 플레이트는 항상, 곡선은 런 시작 후, 결과표는 런 완료 후) ----
+function renderSections(state) {
+  renderPlate(state);
+
+  const run = state.qpcr_run;
+  el('curvesSection').style.display = run ? 'block' : 'none';
+  el('resultsSection').style.display = run && !run.running ? 'block' : 'none';
+  if (run) renderCurves(state);
+  if (run && !run.running) renderResults(state);
 }
 
-function renderMain(state) {
-  const mode = computeMode(state);
-  el('viewPlate').style.display = mode === 'plate' ? 'block' : 'none';
-  el('viewCurves').style.display = mode === 'curves' ? 'block' : 'none';
-  el('viewResults').style.display = mode === 'results' ? 'block' : 'none';
-
-  if (mode === 'plate') {
-    el('mainTitle').textContent = '플레이트';
-    el('mainDetail').textContent = `${state.batch} · 샘플 12 × 3반복`;
-    renderPlate(state);
-  } else if (mode === 'curves') {
-    el('mainTitle').textContent = '증폭 곡선';
-    el('mainDetail').textContent = `사이클 ${state.qpcr_run.cycle} / ${state.qpcr_run.total_cycles}`;
-    renderCurves(state);
-  } else {
-    el('mainTitle').textContent = '결과표';
-    el('mainDetail').textContent = `측정 완료 · ${state.batch}`;
-    renderResults(state);
-  }
-}
-
-// ---- 플레이트 그리드 (A~H × 1~12, 실제 데이터는 A~C행만) ----
+// ---- 플레이트 그리드 (A~H × 1~12, 실제 데이터는 A~C행만) — 항상 보이는 섹션 ----
 function renderPlate(state) {
+  el('plateDetail').textContent = `${state.batch} · 샘플 12 × 3반복`;
   const wells = state.plate.wells;
   let html = '<tr><th></th>';
   for (let c = 1; c <= 12; c++) html += `<th>${c}</th>`;
@@ -349,8 +355,9 @@ function renderPlate(state) {
   el('plateTable').innerHTML = html;
 }
 
-// ---- 결과표 (샘플별 3반복 상태) ----
+// ---- 결과표 (샘플별 3반복 상태) — 런 완료 후 나타나는 섹션 ----
 function renderResults(state) {
+  el('resultsDetail').textContent = `측정 완료 · ${state.batch}`;
   const wells = state.plate.wells;
   const bySample = {};
   for (const [wellId, w] of Object.entries(wells)) {
@@ -375,53 +382,85 @@ function renderResults(state) {
 // ---- 증폭 곡선 (결정 12: 시나리오 파일의 실제 형광값을 그대로 그린다.
 //      Agent가 MCP get_qpcr_curves로 받는 값과 같은 출처 — /state의 fluorescence 필드는
 //      대시보드 전용 사본일 뿐, 숫자 자체는 서버가 새로 만들지 않는다.) ----
+const CQ_THRESHOLD = 0.2; // server/state.py의 CQ_THRESHOLD와 동일값(대시보드 표시 전용 상수, 결정 30 시각화 ②)
+const CYCLE_SECONDS = 2; // 결정 11의 고정값(40사이클×2초) — /state에는 안 실려서 클라이언트도 같은 상수를 씀
+
 function buildCurveDatasets(state) {
-  const cycle = state.qpcr_run.cycle;
-  const labels = Array.from({ length: cycle }, (_, i) => i + 1);
+  const total = state.qpcr_run.total_cycles;
+  // 버그 수정(결정 30): labels를 진행 사이클이 아니라 항상 1..total_cycles 전체로 고정한다.
+  // 진행분만큼만 만들면 카테고리 축의 칸 수가 매 프레임 바뀌어 x.max(인덱스)와 어긋나 아예 안 그려졌다.
+  const labels = Array.from({ length: total }, (_, i) => i + 1);
   const datasets = [];
   for (const [wellId, w] of Object.entries(state.plate.wells)) {
     if (w.status === 'empty' || !w.fluorescence || !w.fluorescence.length) continue; // 플레이트에 없는 well
     const isBad = !!w.display_hint;
     datasets.push({
       label: wellId,
-      data: w.fluorescence,
+      data: w.fluorescence, // 서버가 이미 진행 사이클만큼만 잘라서 준다 — 나머지는 그냥 안 그려져서 "차오르는" 효과가 남
       borderColor: isBad ? '#d33' : 'rgba(120,120,120,.4)',
       borderWidth: isBad ? 2.5 : 1,
       pointRadius: 0, tension: 0.15, order: isBad ? 0 : 1,
     });
   }
+  datasets.push({
+    label: '임계값',
+    data: labels.map(() => CQ_THRESHOLD), // 시각화 ②: 형광 0.2 가로 점선, 축 전체 길이로 고정
+    borderColor: '#aaa',
+    borderDash: [6, 4],
+    borderWidth: 1,
+    pointRadius: 0,
+    order: 2,
+  });
   return { labels, datasets };
 }
 
 function renderCurves(state) {
-  const cycle = state.qpcr_run.cycle;
+  const run = state.qpcr_run;
+  const cycle = run.cycle;
+  const total = run.total_cycles;
+
+  el('curvesDetail').textContent = run.running
+    ? `사이클 ${cycle} / ${total}`
+    : `측정 완료 · ${state.batch}`;
+
   if (cycle <= 0) {
     el('curveEmpty').style.display = 'block';
     el('curveWrap').style.display = 'none';
-    return;
-  }
-  el('curveEmpty').style.display = 'none';
-  el('curveWrap').style.display = 'block';
-  const { labels, datasets } = buildCurveDatasets(state);
-  if (!curveChart) {
-    const ctx = el('curveCanvas').getContext('2d');
-    curveChart = new Chart(ctx, {
-      type: 'line',
-      data: { labels, datasets },
-      options: {
-        responsive: true, maintainAspectRatio: false, animation: false,
-        plugins: { legend: { display: false }, tooltip: { enabled: false } },
-        scales: {
-          x: { title: { display: true, text: '사이클' }, min: 0, max: state.qpcr_run.total_cycles },
-          y: { title: { display: true, text: '형광' }, min: 0, max: 1.1 },
-        },
-      },
-    });
   } else {
-    curveChart.data.labels = labels;
-    curveChart.data.datasets = datasets;
-    curveChart.options.scales.x.max = state.qpcr_run.total_cycles;
-    curveChart.update('none');
+    el('curveEmpty').style.display = 'none';
+    el('curveWrap').style.display = 'block';
+    const { labels, datasets } = buildCurveDatasets(state);
+    if (!curveChart) {
+      const ctx = el('curveCanvas').getContext('2d');
+      curveChart = new Chart(ctx, {
+        type: 'line',
+        data: { labels, datasets },
+        options: {
+          responsive: true, maintainAspectRatio: false, animation: false,
+          plugins: { legend: { display: false }, tooltip: { enabled: false } },
+          scales: {
+            // 버그 수정: x.min/max로 카테고리 인덱스를 강제하지 않는다 — labels가 이미 1..total_cycles로
+            // 고정돼 있으니 축은 그 길이에 맞춰 자연스럽게 잡힌다.
+            x: { title: { display: true, text: '사이클' } },
+            y: { title: { display: true, text: '형광' }, min: 0, max: 1.1 },
+          },
+        },
+      });
+    } else {
+      curveChart.data.labels = labels;
+      curveChart.data.datasets = datasets;
+      curveChart.update('none');
+    }
+  }
+
+  // 시각화 ③: 런 진행 바 + 사이클/예상 남은 시간(결정론 값)
+  const pct = total > 0 ? Math.min(100, (cycle / total) * 100) : 0;
+  el('curveProgressFill').style.width = `${pct}%`;
+  if (run.running) {
+    const remainSec = Math.max(0, (total - cycle) * CYCLE_SECONDS);
+    el('curveProgressText').textContent = `사이클 ${cycle} / ${total} · 약 ${remainSec}초 남음`;
+  } else {
+    el('curveProgressText').textContent = '측정 완료';
   }
 }
 
@@ -515,7 +554,7 @@ function applyState(state) {
   lastState = state;
   updateBatchToggle(state.batch);
   renderDevices(state);
-  renderMain(state);
+  renderSections(state);
   ensurePolling(state);
 }
 

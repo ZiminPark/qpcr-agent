@@ -98,11 +98,18 @@ def run_liquid_handler(state: LabState, worklist: list[dict[str, Any]]) -> dict:
     # 여기서부터는 전량 실행 (부분 실행 없음, 결정 16)
     state.devices["liquid_handler"]["reagent_ul"] = round(available - buffer_requested, 2)
     state.devices["liquid_handler"]["last_run_entries"] = len(worklist)  # 대시보드 부제용 지속 이력
-    filled_wells: list[str] = []
+    # 응답 정직화(결정 31) — 기존 status가 "empty"였던 칸만 "새로 채움"이고, 이미 filled/done이던
+    # 칸은 재분주(중복 투입)다. status 자체는 지금처럼 "filled"로 세팅한다(done → filled 되돌림이
+    # 재준비의 의미상 맞다). 재분주를 거부하지는 않는다(결정 31 — stage5 guardrail 서사 보호).
+    newly_filled: list[str] = []
+    refilled: list[str] = []
     for sample_id in sample_ids:
         for well_id in _find_sample_wells(state, sample_id):
+            was_empty = state.plate[well_id]["status"] == "empty"
             state.plate[well_id]["status"] = "filled"
-            filled_wells.append(well_id)
+            (newly_filled if was_empty else refilled).append(well_id)
+    newly_filled.sort()
+    refilled.sort()
 
     state.last_worklist = {
         "entries": worklist,
@@ -110,18 +117,25 @@ def run_liquid_handler(state: LabState, worklist: list[dict[str, Any]]) -> dict:
         "buffer_used_ul": round(buffer_requested, 2),
     }
     remaining = state.devices["liquid_handler"]["reagent_ul"]
-    state.add_tool_trace(
-        "run_liquid_handler",
-        f"{len(worklist)}건 이송 완료 · buffer {remaining:.1f} µL 남음",
-    )
+    summary = f"{len(worklist)}건 이송 완료 · buffer {remaining:.1f} µL 남음"
+    if refilled:
+        summary += f" · 이미 찬 칸 {len(refilled)}개 재투입"
+    state.add_tool_trace("run_liquid_handler", summary)
     state.broadcast_state()
-    return {
+    result = {
         "ok": True,
         "entries_executed": len(worklist),
-        "wells_filled": sorted(filled_wells),
+        "wells_filled": newly_filled,
         "buffer_used_ul": round(buffer_requested, 2),
         "reagent_ul_remaining": remaining,
     }
+    if refilled:
+        result["wells_refilled"] = refilled
+        result["warning"] = (
+            f"이미 채워진 칸 {len(refilled)}개에 추가 투입됐습니다: {', '.join(refilled)}. "
+            "재준비가 목적이면 먼저 리셋하세요."
+        )
+    return result
 
 
 def reserve_quantstudio(state: LabState) -> dict:

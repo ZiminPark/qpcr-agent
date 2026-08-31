@@ -53,6 +53,27 @@
   Cq는 노출된 IL6 형광 곡선에서 Agent가 직접 계산해야 한다(결정 9, 18).
 - `qpcr_run`: 런이 시작 안 됐으면 `null`.
 
+## MCP `run_liquid_handler` 응답 (결정 31)
+
+이 필드들은 대시보드가 아니라 Agent가 받는 MCP 도구 응답에 실린다 — 여기 적어두는 이유는 대시보드
+trace 카드의 `result_summary`·`warning` 문구와 짝을 이루기 때문이다.
+
+```json
+{ "ok": true, "entries_executed": 20, "wells_filled": ["A1", "B1", "C1"],
+  "wells_refilled": ["A2", "B2", "C2"],
+  "warning": "이미 채워진 칸 3개에 추가 투입됐습니다: A2, B2, C2. 재준비가 목적이면 먼저 리셋하세요.",
+  "buffer_used_ul": 338.56, "reagent_ul_remaining": 1661.44 }
+```
+
+- `wells_filled`: **이번 호출로 새로 채운 칸만**(기존 status가 `empty`였던 칸). 이미 `filled`나
+  `done`이던 칸에 다시 분주해도 여기엔 들어가지 않는다 — "새로 채워졌다"는 오해를 막기 위함.
+- `wells_refilled`: 이미 채워져 있던 칸에 재분주된 칸 목록. 비어 있으면 이 필드 자체가 응답에
+  없다. status는 두 경우 모두(신규/재분주) `filled`로 세팅된다(`done`이었던 칸이 재분주되면
+  `filled`로 되돌아간다 — 재준비의 의미상 맞다).
+- `warning`: `wells_refilled`가 비어 있지 않을 때만 존재. 재분주가 있었다는 안내 문구(일상어).
+  **재분주 자체를 거부하지는 않는다** — buffer 잔량 검사(결정 16)가 유일한 거부 사유이고, 순서도
+  잔량 검사가 먼저다.
+
 ## GET /events (SSE)
 
 연결 즉시 `event: state`(전체 스냅샷) 1회 → 이후 상태가 바뀔 때마다 푸시.
@@ -80,7 +101,9 @@ data: { ...trace 이벤트 1건... }
   "result_summary": "20건 이송 완료 · buffer 1661.4 µL 남음", "rejected": false }
 ```
 `rejected: true`면 buffer 부족으로 거부된 호출(결정 16 — 거부도 카드로 남긴다). `label`이 한글
-설명(고정 매핑, `server/state.py`의 `TOOL_LABELS_KO`).
+설명(고정 매핑, `server/state.py`의 `TOOL_LABELS_KO`). `run_liquid_handler`가 이미 채워진
+칸에 재분주한 경우 `result_summary`에 `" · 이미 찬 칸 N개 재투입"`이 덧붙는다(결정 31 — MCP 도구
+응답 쪽 상세는 아래 참고).
 
 **2. `user_prompt`** — `UserPromptSubmit` 훅이 만든다.
 

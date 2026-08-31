@@ -5,7 +5,9 @@
       "mcp__qpcr_lab__check_devices"
     ],
     "deny": [
-      "Read(../**)"
+      "Read(//**/qpcr_agent/docs/**)",
+      "Read(//**/qpcr_agent/server/**)",
+      "Read(//**/qpcr_agent/CONTEXT.local.md)"
     ]
   },
   "hooks": {

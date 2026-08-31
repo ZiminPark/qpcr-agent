@@ -13,7 +13,9 @@
   },
   "permissions": {
     "deny": [
-      "Read(../**)"
+      "Read(//**/qpcr_agent/docs/**)",
+      "Read(//**/qpcr_agent/server/**)",
+      "Read(//**/qpcr_agent/CONTEXT.local.md)"
     ]
   }
 }

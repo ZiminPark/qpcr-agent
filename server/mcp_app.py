@@ -54,7 +54,7 @@ def _build_write_server() -> MCPServer:
     @srv.tool(
         name="run_liquid_handler",
         description=(
-            "작업 목록을 액체 핸들러로 실행해 플레이트에 샘플을 채운다. "
+            "작업 목록을 액체 핸들러로 실행해 one-step RT-qPCR 시약이 미리 분주된 플레이트에 샘플을 채운다. "
             'worklist는 [{"sample_id","source":"sample|buffer","volume_ul"}] 형식. '
             "buffer 잔량이 부족하면 실행 전에 전체가 거부된다(부분 실행 없음)."
         ),
@@ -83,7 +83,7 @@ def _build_qpcr_server() -> MCPServer:
     @srv.tool(
         name="run_liquid_handler",
         description=(
-            "작업 목록을 액체 핸들러로 실행해 플레이트에 샘플을 채운다. "
+            "작업 목록을 액체 핸들러로 실행해 one-step RT-qPCR 시약이 미리 분주된 플레이트에 샘플을 채운다. "
             'worklist는 [{"sample_id","source":"sample|buffer","volume_ul"}] 형식. '
             "buffer 잔량이 부족하면 실행 전에 전체가 거부된다(부분 실행 없음)."
         ),
@@ -95,7 +95,10 @@ def _build_qpcr_server() -> MCPServer:
     def reserve_quantstudio() -> dict:
         return tools.reserve_quantstudio(lab_state)
 
-    @srv.tool(name="start_qpcr", description="예약된 QuantStudio에서 qPCR 런을 시작한다 (40사이클).")
+    @srv.tool(
+        name="start_qpcr",
+        description="예약된 QuantStudio에서 one-step RT-qPCR 런을 시작한다 (40사이클, 시간은 데모용 압축).",
+    )
     def start_qpcr() -> dict:
         return tools.start_qpcr(lab_state)
 
@@ -103,8 +106,9 @@ def _build_qpcr_server() -> MCPServer:
         name="get_qpcr_curves",
         description=(
             "진행 중이거나 끝난 qPCR 런의 well별 형광 곡선을 현재까지의 사이클만큼 읽는다. "
-            "well마다 기준 유전자(GAPDH) Cq(gapdh_cq)도 함께 온다 — 목표 유전자(IL6) Cq는 "
-            "형광 곡선에서 직접 계산해야 한다. 플레이트에 실제로 올라간 well만 돌아온다."
+            "2채널 multiplex 측정값 중 well마다 기준 유전자(GAPDH) Cq(gapdh_cq)도 함께 온다 — "
+            "목표 유전자(IL6) Cq는 IL6 형광 곡선에서 직접 계산해야 한다. "
+            "런 중 이상은 잠정 신호이며 재검 판단은 완료 후 한다. 플레이트에 실제로 올라간 well만 돌아온다."
         ),
     )
     def get_qpcr_curves() -> dict:

@@ -48,8 +48,9 @@
   필드 자체는 MCP 응답에는 없다.
 - `cq`: **대시보드 전용**. 전체(40사이클) 곡선에서 서버가 임계값 교차(0.2)로 계산한 고정값. 곡선이
   임계값을 못 넘으면(ⓐ) `null`.
-- `gapdh_cq`: 기준 유전자(GAPDH) Cq 고정값(시나리오 파일). MCP `get_qpcr_curves` 응답에도 동일하게
-  실린다 — 목표 유전자(IL6) Cq는 형광 곡선에서 Agent가 직접 계산해야 한다(결정 9, 18).
+- `gapdh_cq`: IL6/GAPDH 2채널 multiplex 중 기준 유전자(GAPDH)의 장비 계산 Cq를 단순화해
+  시나리오 파일에 고정한 값. MCP `get_qpcr_curves` 응답에도 동일하게 실린다 — 목표 유전자(IL6)
+  Cq는 노출된 IL6 형광 곡선에서 Agent가 직접 계산해야 한다(결정 9, 18).
 - `qpcr_run`: 런이 시작 안 됐으면 `null`.
 
 ## GET /events (SSE)

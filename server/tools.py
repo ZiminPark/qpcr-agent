@@ -145,10 +145,16 @@ def start_qpcr(state: LabState) -> dict:
     }
     state.devices["quantstudio"]["status"] = "busy"
     state.add_tool_trace(
-        "start_qpcr", f"시작됨 ({total_cycles}사이클 예정, 약 {total_cycles*cycle_seconds}초)"
+        "start_qpcr",
+        f"시작됨 ({total_cycles}사이클 예정, 데모 압축 약 {total_cycles*cycle_seconds}초)",
     )
     state.broadcast_state()
-    return {"ok": True, "total_cycles": total_cycles, "cycle_seconds": cycle_seconds}
+    return {
+        "ok": True,
+        "total_cycles": total_cycles,
+        "cycle_seconds": cycle_seconds,
+        "demo_time_compressed": True,
+    }
 
 
 def get_qpcr_curves(state: LabState) -> dict:

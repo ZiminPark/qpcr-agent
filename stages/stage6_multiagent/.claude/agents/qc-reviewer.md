@@ -1,5 +1,6 @@
 ---
 name: qc-reviewer
+model: haiku
 description: 완료된 실험 결과와 보고서를 신선한 컨텍스트로 채점하는 독립 검토자. 실험을 실행한 세션이 끝난 뒤, 그 결과물만 놓고 다시 검토할 때 사용.
 tools: Read, Grep, Glob
 ---

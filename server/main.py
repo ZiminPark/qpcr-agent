@@ -227,31 +227,39 @@ def _parse_command_md(text: str) -> tuple[str, str]:
     return "", text.strip()
 
 
+# 패널 그룹은 stage 단위가 아니라 시연 단위(결정 35). 그룹명은 청중 노출 텍스트.
+PROMPT_GROUPS = [
+    ("챗봇 (stage0)", ["stage0_chatbot"]),
+    ("week1 (stage1~3)", ["stage1_read", "stage2_write", "stage3_loop"]),
+    ("week2 (stage4)", ["stage4_memory"]),
+    ("안전장치 + 동료 Agent (stage5~6)", ["stage5_guardrail", "stage6_multiagent"]),
+]
+
+
 @app.get("/prompts")
 def get_prompts() -> dict:
-    stages: list[dict] = []
+    groups: list[dict] = []
     if not STAGES_DIR.exists():
-        return {"stages": stages}
+        return {"stages": groups}
     seen: set[str] = set()
-    for stage_dir in sorted(STAGES_DIR.iterdir()):
-        if not stage_dir.is_dir():
-            continue
-        commands_dir = stage_dir / ".claude" / "commands"
-        if not commands_dir.is_dir():
-            continue
+    for title, stage_names in PROMPT_GROUPS:
         items = []
-        for md_path in sorted(commands_dir.glob("*.md")):
-            # 커맨드는 stage 간 누적 스냅샷이므로, 패널에는 그 stage에서 처음 등장하는
-            # 프롬프트(= 그 stage에서 실행할 대사)만 올린다. 이전 stage 것은 이미 그 그룹에 있다.
-            if md_path.stem in seen:
+        for stage_name in stage_names:
+            commands_dir = STAGES_DIR / stage_name / ".claude" / "commands"
+            if not commands_dir.is_dir():
                 continue
-            seen.add(md_path.stem)
-            text = md_path.read_text(encoding="utf-8")
-            description, body = _parse_command_md(text)
-            items.append({"name": md_path.stem, "description": description, "body": body})
+            for md_path in sorted(commands_dir.glob("*.md")):
+                # 커맨드는 stage 간 누적 스냅샷이므로, 패널에는 처음 등장하는 프롬프트
+                # (= 그 stage에서 실행할 대사)만 올린다. 이전 것은 이미 앞 그룹에 있다.
+                if md_path.stem in seen:
+                    continue
+                seen.add(md_path.stem)
+                text = md_path.read_text(encoding="utf-8")
+                description, body = _parse_command_md(text)
+                items.append({"name": md_path.stem, "description": description, "body": body})
         if items:
-            stages.append({"stage": stage_dir.name, "items": items})
-    return {"stages": stages}
+            groups.append({"stage": title, "items": items})
+    return {"stages": groups}
 
 
 # ---- 실험 노트 (결정 29) ----

@@ -15,7 +15,7 @@
   "lot": "2508",
   "devices": {
     "nanodrop": { "status": "idle", "last_reading_count": 12 },
-    "liquid_handler": { "status": "idle", "reagent_ul": 186.44, "reagent_ul_initial": 525.0, "last_run_entries": 20 },
+    "liquid_handler": { "status": "idle", "reagent_ul": 1661.44, "reagent_ul_initial": 2000.0, "last_run_entries": 20 },
     "quantstudio": { "status": "busy", "reserved": true }
   },
   "plate": {
@@ -77,7 +77,7 @@ data: { ...trace 이벤트 1건... }
 **1. `tool_call`** — 서버가 도구 호출 시 직접 기록.
 ```json
 { "type": "tool_call", "tool": "run_liquid_handler", "label": "액체 핸들러 실행",
-  "result_summary": "20건 이송 완료 · buffer 186.4 µL 남음", "rejected": false }
+  "result_summary": "20건 이송 완료 · buffer 1661.4 µL 남음", "rejected": false }
 ```
 `rejected: true`면 buffer 부족으로 거부된 호출(결정 16 — 거부도 카드로 남긴다). `label`이 한글
 설명(고정 매핑, `server/state.py`의 `TOOL_LABELS_KO`).

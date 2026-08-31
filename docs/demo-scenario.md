@@ -12,16 +12,16 @@
 
 ## stage0_chatbot — 아는 건 많은데 손발이 없다
 
-- 구성: MCP 없음. 소품은 `results_week0.csv`
-- `results_week0.csv`를 복붙 → "해석해 줘" → **잘한다** (S02의 튄 값도 짚어냄)
-- "지금 QuantStudio 비어 있어?" → **모른다**. 불편 2개를 심는다: 복붙 지겨움 + 실험실이 안 보임
+- 구성: MCP 없음. 소품은 `results_week1.csv`
+- `results_week1.csv`를 복붙 → "해석해 줘" → **잘한다** (S02의 튄 값도 짚어냄)
+- "지금 NanoDrop 연결돼 있어?" → **모른다**. 불편 2개를 심는다: 복붙 지겨움 + 실험실이 안 보임
 - 개념: LLM 단독의 한계
 
 ## stage1_read — 눈을 달아 준다
 
 - 증분: `.mcp.json` (도구: `read_nanodrop`, `check_devices`)
 - "순도 1.8 넘는 샘플만 골라 줘" → tool call JSON을 그대로 보여줌. "생각보다 별거 없죠"
-- "QuantStudio 비어 있어?" → 이제 답한다 (0단계 불편 2개 모두 회수)
+- "NanoDrop 연결돼 있어?" → 이제 답한다 (0단계 불편 2개 모두 회수). 검사(NanoDrop)가 업무의 첫 단계라 다음 대사(합격 샘플 고르기)로 자연히 이어진다
 - **명명의 순간**: 목적 + 도구 = **qPCR Agent**
 - 개념: Tool Calling (read)
 

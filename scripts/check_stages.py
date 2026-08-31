@@ -130,13 +130,13 @@ def check_commands(stage_dir: Path, stage_name: str) -> None:
 
 
 def check_stage0_csv(stage_dir: Path) -> None:
-    csv_path = stage_dir / "results_week0.csv"
+    csv_path = stage_dir / "results_week1.csv"
     if not csv_path.exists():
-        fail("stage0_chatbot/results_week0.csv 가 없습니다 (결정 14)")
+        fail("stage0_chatbot/results_week1.csv 가 없습니다 (결정 14)")
         return
     lines = csv_path.read_text(encoding="utf-8").strip().splitlines()
     if not lines:
-        fail("stage0_chatbot/results_week0.csv 가 비어 있습니다")
+        fail("stage0_chatbot/results_week1.csv 가 비어 있습니다")
         return
     header = lines[0].split(",")
     expected_cols = {
@@ -146,13 +146,13 @@ def check_stage0_csv(stage_dir: Path) -> None:
     }
     if set(header) != expected_cols:
         fail(
-            "stage0_chatbot/results_week0.csv 헤더가 결정 18 형식과 다릅니다: "
+            "stage0_chatbot/results_week1.csv 헤더가 결정 18 형식과 다릅니다: "
             f"{header}"
         )
     n_rows = len(lines) - 1
     if n_rows != 10:
         fail(
-            "stage0_chatbot/results_week0.csv 샘플 행이 10개(S07·S11 불합격 제외, "
+            "stage0_chatbot/results_week1.csv 샘플 행이 10개(S07·S11 불합격 제외, "
             f"lab_notebook.md '지난주 메모'와 일치)여야 하는데 {n_rows}개입니다"
         )
     sample_col = header.index("sample") if "sample" in header else None
@@ -161,7 +161,7 @@ def check_stage0_csv(stage_dir: Path) -> None:
         for excluded in ("S07", "S11"):
             if excluded in sample_ids:
                 fail(
-                    f"stage0_chatbot/results_week0.csv 에 {excluded}가 있습니다 — "
+                    f"stage0_chatbot/results_week1.csv 에 {excluded}가 있습니다 — "
                     "lab_notebook.md '지난주 메모'는 이 샘플을 순도 미달 불합격으로 적어 두었으므로 "
                     "플레이트에 올라간 정상 측정값으로 있으면 안 됩니다 (결정 19)"
                 )

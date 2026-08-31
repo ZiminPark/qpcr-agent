@@ -7,6 +7,9 @@
     "ask": [
       "mcp__qpcr_lab__run_liquid_handler",
       "mcp__qpcr_lab__reserve_quantstudio"
+    ],
+    "deny": [
+      "Read(../**)"
     ]
   },
   "hooks": {

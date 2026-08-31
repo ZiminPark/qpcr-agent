@@ -3,6 +3,9 @@
     "allow": [
       "mcp__qpcr_lab__read_nanodrop",
       "mcp__qpcr_lab__check_devices"
+    ],
+    "deny": [
+      "Read(../**)"
     ]
   },
   "hooks": {

@@ -66,7 +66,7 @@
   "reagent_ul_initial": 1900.0,
   "qpcr": {
     "total_cycles": 40,
-    "cycle_seconds": 0.67
+    "cycle_seconds": 0.25
   },
   "plate_wells": {
     "A1": {

@@ -380,7 +380,7 @@ function renderResults(state) {
 //      Agent가 MCP get_qpcr_curves로 받는 값과 같은 출처 — /state의 fluorescence 필드는
 //      대시보드 전용 사본일 뿐, 숫자 자체는 서버가 새로 만들지 않는다.) ----
 const CQ_THRESHOLD = 0.2; // server/state.py의 CQ_THRESHOLD와 동일값(대시보드 표시 전용 상수, 결정 30 시각화 ②)
-const CYCLE_SECONDS = 0.67; // 결정 33의 고정값(40사이클×0.67초 ≈ 27초) — /state에는 안 실려서 클라이언트도 같은 상수를 씀
+const CYCLE_SECONDS = 0.25; // 결정 33의 고정값(40사이클×0.25초 = 10초) — /state에는 안 실려서 클라이언트도 같은 상수를 씀
 
 function buildCurveDatasets(state) {
   const total = state.qpcr_run.total_cycles;

@@ -1,0 +1,160 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>가상 실험실 — 대시보드 mock</title>
+<style>
+  :root { --line:#ccc; --dim:#777; --ok:#2a7; --busy:#d80; --bad:#d33; --fill:#48c; }
+  body { font-family: -apple-system, "Apple SD Gothic Neo", sans-serif; margin: 0; background:#f5f5f2; color:#222; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 12px; }
+  header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; }
+  header h1 { font-size: 22px; margin: 0; }
+  header .stage { font-size: 15px; color: var(--dim); }
+  header button { font-size: 12px; }
+
+  .devices { display:flex; gap:10px; margin-bottom:10px; }
+  .dev { flex:1; background:#fff; border:1px solid var(--line); border-radius:6px; padding:10px 12px; }
+  .dev .name { font-size: 15px; font-weight: 600; }
+  .dev .badge { display:inline-block; font-size:14px; font-weight:700; padding:1px 8px; border-radius:10px; margin-top:6px; color:#fff; }
+  .badge.idle { background:#999; } .badge.busy { background:var(--busy); } .badge.reserved { background:var(--fill); }
+  .dev .sub { font-size: 13px; color: var(--dim); margin-top:6px; }
+
+  .main { background:#fff; border:1px solid var(--line); border-radius:6px; padding:12px; margin-bottom:10px; }
+  .main-title { font-size:20px; margin:28px 0 8px; }
+  .main-sub { display:flex; justify-content:space-between; font-size:13px; color:var(--dim); margin-bottom:8px; }
+  .main-sub .hint { font-size:12px; }
+  canvas { width:100%; height:260px; display:block; }
+
+  /* 플레이트 그리드 */
+  #plate { display:none; }
+  table.plate { border-collapse:collapse; margin:0 auto; }
+  table.plate td, table.plate th { border:1px solid #ddd; width:32px; height:26px; text-align:center; font-size:11px; color:var(--dim); }
+  td.filled { background:#cfe0f5; } td.done { background:#cfeadd; } td.bad { background:#f5c9c9; font-weight:700; color:#900; }
+  .legend { font-size:12px; color:var(--dim); text-align:center; margin-top:6px; }
+  .sw { display:inline-block; width:11px; height:11px; border:1px solid #ccc; vertical-align:-1px; }
+
+  .trace { background:#fff; border:1px solid var(--line); border-radius:6px; padding:12px; }
+  .trace-title { font-size:20px; margin:28px 0 8px; }
+  .trace ol { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; }
+  .trace li { padding:10px 12px; border:1px solid #eee; border-radius:6px; font-size:14px; line-height:1.5; color:#555; }
+  .trace .t { display:flex; justify-content:space-between; font-size:12px; font-weight:700; letter-spacing:.06em; color:var(--dim); text-transform:uppercase; margin-bottom:5px; }
+  .trace .ts { font-weight:400; letter-spacing:0; font-variant-numeric:tabular-nums; }
+  .trace .k { font-weight:700; margin-right:6px; }
+  .trace .tool { font-family:ui-monospace,monospace; font-size:0.95em; background:#f0f0ec; padding:1px 6px; border-radius:4px; }
+  .trace .res { color:var(--dim); font-size:0.88em; }
+  .trace li.user { background:#f2f6ff; border-radius:4px; }
+  .trace li.agent { background:#fffceb; border-radius:4px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🧪 가상 실험실</h1>
+    <span class="stage">stage4_loop · 시나리오 week_normal</span>
+    <button onclick="alert('상태 초기화 (mock)')">리셋</button>
+  </header>
+
+  <div class="devices">
+    <div class="dev"><div class="name">NanoDrop</div><span class="badge idle">대기</span>
+      <div class="sub">마지막 측정: 샘플 12건</div></div>
+    <div class="dev"><div class="name">액체 핸들러</div><span class="badge idle">대기</span>
+      <div class="sub">시약 잔량 buffer 525 µL</div></div>
+    <div class="dev"><div class="name">QuantStudio</div><span class="badge busy">작동중</span>
+      <div class="sub">qPCR 사이클 28 / 40</div></div>
+  </div>
+
+  <h2 class="main-title"><span id="mainTitle">증폭 곡선</span></h2>
+  <div class="main">
+    <div class="main-sub"><span id="mainDetail">사이클 28/40</span>
+      <span class="hint"><a href="#" onclick="toggle();return false">플레이트/곡선 전환 (mock 전용 — 실물은 자동)</a></span></div>
+    <canvas id="curves" width="820" height="260"></canvas>
+    <div id="plate">
+      <table class="plate" id="plateTable"></table>
+      <div class="legend">
+        <span class="sw" style="background:#fff"></span> 비어있음
+        <span class="sw" style="background:#cfe0f5"></span> 채워짐
+        <span class="sw" style="background:#cfeadd"></span> 측정완료
+        <span class="sw" style="background:#f5c9c9"></span> 이상 (Agent 판정)
+        &nbsp;·&nbsp; 열 = 샘플(S01~S12), 행 A·B·C = 3반복
+      </div>
+    </div>
+  </div>
+
+  <h2 class="trace-title">Trace 타임라인</h2>
+  <div class="trace">
+    <ol>
+      <li><div class="t"><span>🔧 Tool 호출 — 곡선 읽기</span><span class="ts">10:27:15</span></div>
+        <span class="tool">get_qpcr_curves</span> <span class="res">→ 36 wells · 사이클 28 · B3 평탄</span></li>
+      <li><div class="t"><span>🔧 Tool 호출 — 곡선 읽기</span><span class="ts">10:09:02</span></div>
+        <span class="tool">get_qpcr_curves</span> <span class="res">→ 36 wells · 사이클 20 · 정상 진행</span></li>
+      <li><div class="t"><span>🔧 Tool 호출 — qPCR 시작</span><span class="ts">09:24:30</span></div>
+        <span class="tool">start_qpcr</span> <span class="res">→ 시작됨 (40사이클 예정)</span></li>
+      <li class="user"><div class="t"><span>💬 사용자 프롬프트</span><span class="ts">09:24:12</span></div>
+        "플레이트 준비됐으면 qPCR 시작하고, 끝날 때까지 지켜봐 줘"</li>
+      <li><div class="t"><span>🔧 Tool 호출 — 액체 핸들러 실행</span><span class="ts">09:21:48</span></div>
+        <span class="tool">run_liquid_handler</span> <span class="res">→ 20건 이송 완료 · buffer 525 µL 남음</span></li>
+      <li><div class="t"><span>✅ 사람 승인</span><span class="ts">09:12:05</span></div>
+        작업 목록(worklist) 20건 실행 허용</li>
+    </ol>
+  </div>
+</div>
+
+<script>
+// ---- 증폭 곡선 (결정론 mock: well별 고정 파라미터의 시그모이드) ----
+const cv = document.getElementById('curves'), ctx = cv.getContext('2d');
+const CYC = 40, NOW = 28;
+function sig(c, cq){ return 1/(1+Math.exp(-(c-cq)/1.6)); }
+function draw(){
+  ctx.clearRect(0,0,cv.width,cv.height);
+  const L=40,B=230,W=cv.width-60,H=200;
+  ctx.strokeStyle='#999'; ctx.beginPath(); ctx.moveTo(L,B-H); ctx.lineTo(L,B); ctx.lineTo(L+W,B); ctx.stroke();
+  ctx.fillStyle='#777'; ctx.font='12px sans-serif';
+  for(let c=0;c<=CYC;c+=10) ctx.fillText(c, L+W*c/CYC-4, B+16);
+  ctx.fillText('형광', 4, B-H+10); ctx.fillText('사이클', L+W-30, B+30);
+  // 정상 35 wells: 회색
+  for(let i=0;i<35;i++){
+    const cq = 16 + (i*7)%12 + (i%3)*0.4;    // 고정 파라미터
+    ctx.strokeStyle='rgba(120,120,120,.45)'; ctx.beginPath();
+    for(let c=0;c<=NOW;c++){ const x=L+W*c/CYC, y=B-H*sig(c,cq)*0.95;
+      c?ctx.lineTo(x,y):ctx.moveTo(x,y); }
+    ctx.stroke();
+  }
+  // 이상 well B3: 평탄, Agent 감지 후라 빨강 + 라벨
+  ctx.strokeStyle='#d33'; ctx.lineWidth=2.5; ctx.beginPath();
+  for(let c=0;c<=NOW;c++){ const x=L+W*c/CYC, y=B-6-((c*13)%5); c?ctx.lineTo(x,y):ctx.moveTo(x,y); }
+  ctx.stroke(); ctx.lineWidth=1;
+  ctx.fillStyle='#d33'; ctx.font='bold 15px sans-serif';
+  ctx.fillText('B3 (S03) — 증폭 없음', L+W*NOW/CYC-150, B-24);
+  // 진행선
+  ctx.strokeStyle='#d80'; ctx.setLineDash([4,3]); ctx.beginPath();
+  ctx.moveTo(L+W*NOW/CYC, B-H); ctx.lineTo(L+W*NOW/CYC, B); ctx.stroke(); ctx.setLineDash([]);
+}
+draw();
+
+// ---- 플레이트 96칸 (행 A~H × 열 1~12) ----
+const tbl = document.getElementById('plateTable');
+let html = '<tr><th></th>'; for(let c=1;c<=12;c++) html+='<th>'+c+'</th>'; html+='</tr>';
+'ABCDEFGH'.split('').forEach(r=>{
+  html += '<tr><th>'+r+'</th>';
+  for(let c=1;c<=12;c++){
+    let cls='', txt='';
+    if('ABC'.includes(r)){ cls = (r==='B'&&c===3) ? 'bad' : 'filled'; txt = (r==='B'&&c===3)?'!':''; }
+    html += '<td class="'+cls+'">'+txt+'</td>';
+  }
+  html += '</tr>';
+});
+tbl.innerHTML = html;
+
+function toggle(){
+  const p=document.getElementById('plate'), c=document.getElementById('curves'),
+        t=document.getElementById('mainTitle'), d=document.getElementById('mainDetail');
+  const showPlate = p.style.display!=='block';
+  p.style.display = showPlate?'block':'none';
+  c.style.display = showPlate?'none':'block';
+  t.textContent = showPlate?'플레이트':'증폭 곡선';
+  d.textContent = showPlate?'week_normal · 샘플 12 × 3반복':'사이클 28/40';
+}
+</script>
+</body>
+</html>

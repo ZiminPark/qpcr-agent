@@ -2,11 +2,13 @@
   "permissions": {
     "allow": [
       "mcp__qpcr_lab__read_nanodrop",
-      "mcp__qpcr_lab__check_devices"
+      "mcp__qpcr_lab__check_devices",
+      "mcp__qpcr_lab__get_qpcr_curves"
     ],
     "ask": [
       "mcp__qpcr_lab__run_liquid_handler",
-      "mcp__qpcr_lab__reserve_quantstudio"
+      "mcp__qpcr_lab__reserve_quantstudio",
+      "mcp__qpcr_lab__start_qpcr"
     ],
     "deny": [
       "Read(//**/qpcr_agent/docs/**)",
@@ -27,7 +29,7 @@
     ],
     "PreToolUse": [
       {
-        "matcher": "mcp__qpcr_lab__run_liquid_handler|mcp__qpcr_lab__reserve_quantstudio",
+        "matcher": "mcp__qpcr_lab__run_liquid_handler|mcp__qpcr_lab__reserve_quantstudio|mcp__qpcr_lab__start_qpcr",
         "hooks": [
           {
             "type": "command",
@@ -38,7 +40,7 @@
     ],
     "PostToolUse": [
       {
-        "matcher": "mcp__qpcr_lab__run_liquid_handler|mcp__qpcr_lab__reserve_quantstudio",
+        "matcher": "mcp__qpcr_lab__run_liquid_handler|mcp__qpcr_lab__reserve_quantstudio|mcp__qpcr_lab__start_qpcr",
         "hooks": [
           {
             "type": "command",

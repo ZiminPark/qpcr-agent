@@ -16,8 +16,8 @@ from .state import lab_state
 STAGE_TOOLSET: dict[str, str] = {
     "stage1_read": "read",
     "stage2_write": "write",
-    "stage3_memory": "write",
-    "stage4_loop": "qpcr",
+    "stage3_loop": "qpcr",
+    "stage4_memory": "qpcr",
     "stage5_guardrail": "qpcr",
     "stage6_multiagent": "qpcr",
 }

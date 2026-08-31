@@ -12,12 +12,13 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 STAGES_DIR = REPO_ROOT / "stages"
 
 # 정식 stage 이름 8개 (CONTEXT.local.md). stage7_mhs는 구현 보류(결정 24) — 존재하면 안 됨.
+# stage3/4 순서는 결정 32에서 loop <-> memory로 교체됐다 (loop가 먼저, memory는 week2 초입).
 ALL_STAGE_NAMES = [
     "stage0_chatbot",
     "stage1_read",
     "stage2_write",
-    "stage3_memory",
-    "stage4_loop",
+    "stage3_loop",
+    "stage4_memory",
     "stage5_guardrail",
     "stage6_multiagent",
     "stage7_mhs",
@@ -149,11 +150,14 @@ def check_stage0_csv(stage_dir: Path) -> None:
             "stage0_chatbot/results_week1.csv 헤더가 결정 18 형식과 다릅니다: "
             f"{header}"
         )
+    # 이 CSV는 stage0의 독립된 소품 데이터다(결정 32로 lab_notebook.md '지난주 메모'가 실제
+    # week1 시나리오 값(S05·S09 불합격)을 가리키게 되면서, stage0 소품과는 더 이상 같은 주를
+    # 가리키지 않는다 — 여기 제외된 S07·S11은 이 소품 자체의 고정값일 뿐이다).
     n_rows = len(lines) - 1
     if n_rows != 10:
         fail(
-            "stage0_chatbot/results_week1.csv 샘플 행이 10개(S07·S11 불합격 제외, "
-            f"lab_notebook.md '지난주 메모'와 일치)여야 하는데 {n_rows}개입니다"
+            f"stage0_chatbot/results_week1.csv 샘플 행이 10개(S07·S11 불합격 제외)여야 하는데 "
+            f"{n_rows}개입니다"
         )
     sample_col = header.index("sample") if "sample" in header else None
     if sample_col is not None:
@@ -162,17 +166,19 @@ def check_stage0_csv(stage_dir: Path) -> None:
             if excluded in sample_ids:
                 fail(
                     f"stage0_chatbot/results_week1.csv 에 {excluded}가 있습니다 — "
-                    "lab_notebook.md '지난주 메모'는 이 샘플을 순도 미달 불합격으로 적어 두었으므로 "
-                    "플레이트에 올라간 정상 측정값으로 있으면 안 됩니다 (결정 19)"
+                    "이 소품 데이터는 이 샘플을 순도 미달 불합격으로 제외해 둔 상태여야 합니다 (결정 19)"
                 )
 
 
 def check_memory_files(stage_dir: Path, stage_name: str) -> None:
-    """lab_notebook.md는 resources/ 공통 리소스 하나(결정 29) — stage 사본은 없어야 한다."""
+    """lab_notebook.md는 resources/ 공통 리소스 하나(결정 29) — stage 사본은 없어야 한다.
+
+    노트 import는 stage4_memory부터다(결정 32 — loop가 먼저이고 memory에서 노트가 생긴다).
+    """
     claude_md = stage_dir / "CLAUDE.md"
     notebook = stage_dir / "lab_notebook.md"
     if not claude_md.exists():
-        fail(f"{stage_name}/CLAUDE.md 가 없습니다 (결정 14)")
+        fail(f"{stage_name}/CLAUDE.md 가 없습니다 (결정 14, 32)")
     else:
         content = claude_md.read_text(encoding="utf-8")
         if "@../../resources/lab_notebook.md" not in content:
@@ -188,6 +194,17 @@ def check_memory_files(stage_dir: Path, stage_name: str) -> None:
     resources_notebook = REPO_ROOT / "resources" / "lab_notebook.md"
     if not resources_notebook.exists():
         fail("resources/lab_notebook.md 가 없습니다 (결정 29)")
+
+
+def check_no_memory_yet(stage_dir: Path, stage_name: str) -> None:
+    """stage3_loop는 아직 노트가 없어야 한다(결정 32 — memory는 stage4부터)."""
+    if (stage_dir / "CLAUDE.md").exists():
+        fail(
+            f"{stage_name}/CLAUDE.md 가 있습니다 — memory는 stage4_memory부터 도입되므로 "
+            "stage3_loop에는 CLAUDE.md(노트 import)가 없어야 합니다 (결정 32)"
+        )
+    if (stage_dir / "lab_notebook.md").exists():
+        fail(f"{stage_name}/lab_notebook.md 사본이 있습니다 — 정본은 resources/ 하나여야 합니다 (결정 29)")
 
 
 def check_qc_reviewer(stage_dir: Path) -> None:
@@ -221,7 +238,10 @@ def main() -> int:
         if name == "stage0_chatbot":
             check_stage0_csv(stage_dir)
 
-        if name in ("stage3_memory", "stage4_loop", "stage5_guardrail", "stage6_multiagent"):
+        if name == "stage3_loop":
+            check_no_memory_yet(stage_dir, name)
+
+        if name in ("stage4_memory", "stage5_guardrail", "stage6_multiagent"):
             check_memory_files(stage_dir, name)
 
         if name == "stage6_multiagent":

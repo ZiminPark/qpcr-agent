@@ -4,10 +4,10 @@
 
 ## 용어
 
-- **Stage**: 발표의 구현 증분 하나. Claude Code 세션을 여는 디렉터리 하나와 1:1 대응하며, 기법 라벨 하나를 가르친다. 정식 이름은 `stageN_이름` 형식: `stage0_chatbot`, `stage1_read`, `stage2_write`, `stage3_memory`, `stage4_loop`, `stage5_guardrail`, `stage6_multiagent`, `stage7_mhs`. 서버·대시보드·디렉터리·대화에서 모두 이 이름을 쓴다.
+- **Stage**: 발표의 구현 증분 하나. Claude Code 세션을 여는 디렉터리 하나와 1:1 대응하며, 기법 라벨 하나를 가르친다. 정식 이름은 `stageN_이름` 형식: `stage0_chatbot`, `stage1_read`, `stage2_write`, `stage3_loop`, `stage4_memory`, `stage5_guardrail`, `stage6_multiagent`, `stage7_mhs`(결정 32 — loop가 memory보다 먼저). 서버·대시보드·디렉터리·대화에서 모두 이 이름을 쓴다.
 - **Virtual Lab 서버**: 가상 실험 기기(NanoDrop, 액체 핸들러, QuantStudio, MHS 챕터의 원심분리기·HPLC)를 시뮬레이션하는 단일 Python 프로세스. MCP(streamable HTTP)와 브라우저 대시보드를 함께 서빙한다.
 - **상태 딕셔너리 (state dictionary)**: Virtual Lab 서버가 인메모리로 들고 있는 기기 상태 단일 객체. MCP 도구와 대시보드가 같은 객체를 본다. Janelia의 shared memory state dictionary의 축소 재현.
-- **도구 세트 (toolset)**: 서버가 한 stage에 노출하는 MCP 도구 목록. stage 이름 → 도구 세트 매핑 테이블은 서버가 소유한다. 여러 stage가 같은 도구 세트를 공유할 수 있다 (예: stage3_memory는 stage2_write와 동일).
+- **도구 세트 (toolset)**: 서버가 한 stage에 노출하는 MCP 도구 목록. stage 이름 → 도구 세트 매핑 테이블은 서버가 소유한다. 여러 stage가 같은 도구 세트를 공유할 수 있다 (예: stage5_guardrail은 stage3_loop와 동일).
 - **최종 무인 완주 데모**: 별도 stage가 아니다. `stage6_multiagent`에서 실행하는 전체 런.
 - **시작 킷**: 청중에게 공유하는 실습 자산. 별도 repo가 아니라 이 repo 자체가 시작 킷을 겸한다.
 

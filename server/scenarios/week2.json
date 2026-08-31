@@ -63,7 +63,7 @@
       "purity_a260_280": 2.01
     }
   ],
-  "reagent_ul_initial": 2000.0,
+  "reagent_ul_initial": 1900.0,
   "qpcr": {
     "total_cycles": 40,
     "cycle_seconds": 2

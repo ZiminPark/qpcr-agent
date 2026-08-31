@@ -93,7 +93,6 @@
   .curve-progress-track { flex:1; height:6px; background:#eee; border-radius:3px; overflow:hidden; }
   .curve-progress-fill { height:100%; width:0%; background:var(--fill); border-radius:3px; transition:width .3s linear; }
   .curve-progress-text { white-space:nowrap; }
-  .curve-threshold-note { font-size:12px; color:var(--dim); margin-top:6px; } /* 결정 30 시각화 ② 설명 */
 
   /* 플레이트 그리드 */
   table.plate { border-collapse:collapse; margin:0 auto; }
@@ -199,7 +198,6 @@
         <div class="curve-progress-track"><div class="curve-progress-fill" id="curveProgressFill"></div></div>
         <span class="curve-progress-text" id="curveProgressText">—</span>
       </div>
-      <div class="curve-threshold-note">임계값 0.2 — 이 선을 넘는 시점이 Cq</div>
     </div>
   </div>
 
@@ -225,8 +223,7 @@
   </div>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
-<script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script><script>
 'use strict';
 
 // ---- 기기 표시 이름/서브 텍스트 ----
@@ -396,10 +393,14 @@ function buildCurveDatasets(state) {
     const isBad = !!w.display_hint;
     datasets.push({
       label: wellId,
+      // 호버 툴팁용 부가 정보 — Chart.js는 모르는 속성을 그대로 보존해준다
+      sampleId: w.sample_id,
+      repLabel: 'ABC'[w.replicate - 1] || wellId[0],
       data: w.fluorescence, // 서버가 이미 진행 사이클만큼만 잘라서 준다 — 나머지는 그냥 안 그려져서 "차오르는" 효과가 남
       borderColor: isBad ? '#d33' : 'rgba(120,120,120,.4)',
       borderWidth: isBad ? 2.5 : 1,
-      pointRadius: 0, tension: 0.15, order: isBad ? 0 : 1,
+      pointRadius: 0, pointHitRadius: 8, pointHoverRadius: 3,
+      tension: 0.15, order: isBad ? 0 : 1,
     });
   }
   datasets.push({
@@ -437,12 +438,26 @@ function renderCurves(state) {
         data: { labels, datasets },
         options: {
           responsive: true, maintainAspectRatio: false, animation: false,
-          plugins: { legend: { display: false }, tooltip: { enabled: false } },
+          interaction: { mode: 'nearest', intersect: true },
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              enabled: true,
+              filter: (item) => item.dataset.label !== '임계값', // 점선은 툴팁 대상에서 제외
+              callbacks: {
+                title: (items) => {
+                  const d = items[0].dataset;
+                  return `${d.sampleId} · 반복 ${d.repLabel} (well ${d.label})`;
+                },
+                label: (item) => `사이클 ${item.label} · 형광 ${item.parsed.y}`,
+              },
+            },
+          },
           scales: {
             // 버그 수정: x.min/max로 카테고리 인덱스를 강제하지 않는다 — labels가 이미 1..total_cycles로
             // 고정돼 있으니 축은 그 길이에 맞춰 자연스럽게 잡힌다.
             x: { title: { display: true, text: '사이클' } },
-            y: { title: { display: true, text: '형광' }, min: 0, max: 1.1 },
+            y: { title: { display: true, text: '빛의 세기(형광)' }, min: 0, max: 1.1 },
           },
         },
       });

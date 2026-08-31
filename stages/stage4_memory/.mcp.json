@@ -2,7 +2,7 @@
   "mcpServers": {
     "qpcr_lab": {
       "type": "http",
-      "url": "http://localhost:8000/mcp/stage4_loop/"
+      "url": "http://localhost:8000/mcp/stage4_memory/"
     }
   }
 }

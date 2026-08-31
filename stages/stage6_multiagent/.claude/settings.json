@@ -1,0 +1,51 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__qpcr_lab__read_nanodrop",
+      "mcp__qpcr_lab__check_devices",
+      "mcp__qpcr_lab__get_qpcr_curves"
+    ],
+    "ask": [
+      "mcp__qpcr_lab__run_liquid_handler",
+      "mcp__qpcr_lab__reserve_quantstudio",
+      "mcp__qpcr_lab__start_qpcr"
+    ]
+  },
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -s -X POST http://localhost:8000/trace -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "mcp__qpcr_lab__run_liquid_handler|mcp__qpcr_lab__reserve_quantstudio|mcp__qpcr_lab__start_qpcr",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -s -X POST http://localhost:8000/trace -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "mcp__qpcr_lab__run_liquid_handler|mcp__qpcr_lab__reserve_quantstudio|mcp__qpcr_lab__start_qpcr",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -s -X POST http://localhost:8000/trace -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ]
+  },
+  "enabledMcpjsonServers": [
+    "qpcr_lab"
+  ]
+}

@@ -33,3 +33,6 @@ env/
 htmlcov/
 .mypy_cache/
 .ruff_cache/
+
+# 로컬 Claude Code 설정 (루트 한정 — stages/*/.claude 는 트래킹 대상)
+/.claude/

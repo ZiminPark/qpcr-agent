@@ -1,0 +1,14 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "curl -s -X POST http://localhost:8000/trace -H 'Content-Type: application/json' -d @- >/dev/null 2>&1 || true"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "qpcr_lab": {
+      "type": "http",
+      "url": "http://localhost:8000/mcp/stage2_write/"
+    }
+  }
+}

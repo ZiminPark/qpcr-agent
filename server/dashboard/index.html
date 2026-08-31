@@ -1,0 +1,558 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>가상 실험실 — 대시보드</title>
+<style>
+  :root { --line:#ccc; --dim:#777; --ok:#2a7; --busy:#d80; --bad:#d33; --fill:#48c; }
+  * { box-sizing: border-box; }
+  body { font-family: -apple-system, "Apple SD Gothic Neo", sans-serif; margin: 0; background:#f5f5f2; color:#222; }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 12px; }
+  header { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:10px; gap:10px; }
+  header h1 { font-size: 22px; margin: 0; }
+  header .batch { font-size: 15px; color: var(--dim); }
+  header button { font-size: 13px; padding: 6px 12px; border-radius: 6px; border: 1px solid var(--line); background: #fff; cursor: pointer; }
+  header button:hover { background: #eee; }
+  header .conn { font-size: 12px; color: var(--dim); }
+  header .conn.off { color: var(--bad); font-weight: 700; }
+
+  /* 프롬프트 모음 패널 (결정 26) — 오른쪽 슬라이드오버, 뒤 대시보드를 가리지 않음 */
+  .prompts {
+    position: fixed; top: 0; right: 0; bottom: 0; width: 400px; max-width: 92vw;
+    background: #fff; border-left: 1px solid var(--line); box-shadow: -6px 0 18px rgba(0,0,0,.12);
+    padding: 14px 14px 20px; overflow-y: auto; z-index: 50;
+    transform: translateX(100%); transition: transform .18s ease-out;
+  }
+  .prompts.open { transform: translateX(0); }
+  .prompts-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .prompts h2 { font-size:16px; margin:0; }
+  .prompts-close { font-size:16px; line-height:1; padding:4px 9px; border-radius:6px; border:1px solid var(--line); background:#fff; cursor:pointer; color:var(--dim); }
+  .prompts-close:hover { background:#eee; }
+  .prompts-stage { margin-bottom:14px; }
+  .prompts-stage:last-child { margin-bottom:0; }
+  .prompts-stage-name { font-size:14px; font-weight:700; color:var(--dim); margin-bottom:6px; text-transform:none; }
+  .prompt-item { border:1px solid #eee; border-radius:6px; padding:8px 10px; margin-bottom:6px; }
+  .prompt-item:last-child { margin-bottom:0; }
+  .prompt-head { display:flex; justify-content:space-between; align-items:baseline; gap:10px; }
+  .prompt-name { font-size:14px; font-weight:600; }
+  .prompt-desc { font-size:13px; color:var(--dim); margin-top:2px; }
+  .prompt-body { font-family:ui-monospace,monospace; font-size:13px; white-space:pre-wrap; background:#f7f7f5; border-radius:4px; padding:8px 10px; margin-top:6px; line-height:1.5; }
+  .prompt-copy { font-size:12px; padding:4px 10px; border-radius:6px; border:1px solid var(--line); background:#fff; cursor:pointer; white-space:nowrap; }
+  .prompt-copy:hover { background:#eee; }
+  .prompt-copy.copied { color:var(--ok); border-color:var(--ok); }
+  .prompts-empty { color:var(--dim); font-size:14px; }
+
+  .devices { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px; align-items:stretch; }
+  .dev { flex:1; min-width:160px; background:#fff; border:1px solid var(--line); border-radius:6px; padding:10px 12px; }
+  .dev .name { font-size: 15px; font-weight: 600; }
+  .dev .role-chip { display:inline-block; font-size:11px; font-weight:500; color:var(--dim); background:#f0f0ec; border-radius:9px; padding:1px 7px; margin-left:6px; vertical-align:1px; }
+  .dev .badge { display:inline-block; font-size:14px; font-weight:700; padding:1px 8px; border-radius:10px; margin-top:6px; color:#fff; }
+  .badge.idle { background:#999; } .badge.busy { background:var(--busy); } .badge.reserved { background:var(--fill); }
+  .badge.active { background:var(--busy); }
+  .dev.active { border-color:var(--busy); background:#fffaf2; }
+  .dev .sub { font-size: 13px; color: var(--dim); margin-top:6px; }
+  .devices-arrow { flex: 0 0 auto; align-self:center; color:var(--dim); font-size:14px; }
+
+  .main { background:#fff; border:1px solid var(--line); border-radius:6px; padding:12px; margin-bottom:10px; }
+  .main-title { font-size:20px; margin:28px 0 8px; }
+  .main-sub { display:flex; justify-content:space-between; align-items:baseline; font-size:13px; color:var(--dim); margin-bottom:8px; gap: 10px; }
+  .main-sub .anomaly-hint { color: var(--bad); font-weight: 700; }
+  #curveWrap { height: 280px; }
+  #curveWrap canvas { width:100% !important; height:100% !important; }
+  #curveEmpty { color: var(--dim); font-size: 14px; padding: 40px 0; text-align: center; }
+
+  /* 플레이트 그리드 */
+  table.plate { border-collapse:collapse; margin:0 auto; }
+  table.plate td, table.plate th { border:1px solid #ddd; width:32px; height:26px; text-align:center; font-size:11px; color:var(--dim); }
+  td.filled { background:#cfe0f5; } td.done { background:#cfeadd; } td.bad { background:#f5c9c9; font-weight:700; color:#900; }
+  .legend { font-size:12px; color:var(--dim); text-align:center; margin-top:6px; }
+  .sw { display:inline-block; width:11px; height:11px; border:1px solid #ccc; vertical-align:-1px; }
+
+  /* 결과표 */
+  table.results { border-collapse:collapse; width:100%; font-size:14px; }
+  table.results th, table.results td { border:1px solid #eee; padding:6px 8px; text-align:center; }
+  table.results th { color:var(--dim); font-weight:600; font-size:12px; }
+  table.results td.rep { width:70px; }
+  table.results td.ok { background:#eaf7f0; color:var(--ok); }
+  table.results td.bad { background:#f5c9c9; color:#900; font-weight:700; }
+  table.results td.empty { background:#f7f7f5; color:#bbb; }
+
+  .trace { background:#fff; border:1px solid var(--line); border-radius:6px; padding:12px; }
+  .trace-title { font-size:20px; margin:28px 0 8px; }
+  .trace ol { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; }
+  .trace li { padding:10px 12px; border:1px solid #eee; border-radius:6px; font-size:14px; line-height:1.5; color:#555; }
+  .trace .t { display:flex; justify-content:space-between; font-size:12px; font-weight:700; letter-spacing:.06em; color:var(--dim); text-transform:uppercase; margin-bottom:5px; }
+  .trace .ts { font-weight:400; letter-spacing:0; font-variant-numeric:tabular-nums; }
+  .trace .tool { font-family:ui-monospace,monospace; font-size:0.95em; background:#f0f0ec; padding:1px 6px; border-radius:4px; }
+  .trace .res { color:var(--dim); font-size:0.88em; }
+  .trace li.user { background:#f2f6ff; border-radius:4px; }
+  .trace li.approval { background:#fffceb; border-radius:4px; }
+  .trace li.rejected { background:#fff2f2; border-color:#f0c9c9; }
+  .trace li.rejected .res { color: var(--bad); font-weight: 600; }
+  .trace-empty { color: var(--dim); font-size: 14px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>🧪 가상 실험실</h1>
+    <span class="batch" id="batchLabel">—</span>
+    <span class="conn" id="connLabel">연결 중…</span>
+    <button id="promptsBtn">프롬프트 모음</button>
+    <button id="nextBatchBtn">다음 배치 투입</button>
+    <button id="resetBtn">리셋</button>
+  </header>
+
+  <div class="prompts" id="promptsPanel">
+    <div class="prompts-head">
+      <h2>프롬프트 모음</h2>
+      <button class="prompts-close" id="promptsCloseBtn" aria-label="닫기">×</button>
+    </div>
+    <div id="promptsBody"></div>
+  </div>
+
+  <div class="devices" id="devices"></div>
+
+  <h2 class="main-title"><span id="mainTitle">플레이트</span></h2>
+  <div class="main">
+    <div class="main-sub">
+      <span id="mainDetail">—</span>
+    </div>
+
+    <div id="viewPlate">
+      <table class="plate" id="plateTable"></table>
+      <div class="legend">
+        <span class="sw" style="background:#fff"></span> 비어있음
+        <span class="sw" style="background:#cfe0f5"></span> 채워짐
+        <span class="sw" style="background:#cfeadd"></span> 측정완료
+        <span class="sw" style="background:#f5c9c9"></span> 이상 (Agent 판정)
+        &nbsp;·&nbsp; 열 = 샘플(S01~S12), 행 A·B·C = 3반복
+      </div>
+    </div>
+
+    <div id="viewCurves" style="display:none">
+      <div id="curveWrap"><canvas id="curveCanvas"></canvas></div>
+      <div id="curveEmpty" style="display:none">런 시작 대기 중…</div>
+    </div>
+
+    <div id="viewResults" style="display:none">
+      <table class="results" id="resultsTable"></table>
+      <div class="legend">
+        <span class="sw" style="background:#eaf7f0"></span> 정상
+        <span class="sw" style="background:#f5c9c9"></span> 이상 (Agent 판정)
+        &nbsp;·&nbsp; 행 = 샘플(S01~S12), 열 = 3반복(A·B·C)
+      </div>
+    </div>
+  </div>
+
+  <h2 class="trace-title">Trace 타임라인</h2>
+  <div class="trace">
+    <ol id="traceList"></ol>
+    <div class="trace-empty" id="traceEmpty" style="display:none">아직 기록된 이벤트가 없습니다.</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.4/chart.umd.min.js"></script>
+<script>
+'use strict';
+
+// ---- 기기 표시 이름/서브 텍스트 ----
+const DEVICE_META = {
+  nanodrop: { name: 'NanoDrop' },
+  liquid_handler: { name: '액체 핸들러' },
+  quantstudio: { name: 'QuantStudio' },
+};
+const BADGE_LABEL = { idle: '대기', busy: '작동중', reserved: '예약됨' };
+// 실험 흐름 파이프라인 시각화용 역할 칩(순수 표현, 서버 무관). 매핑 없는 기기(MHS 등)는 칩·화살표 없이 나열.
+const DEVICE_ROLE = { nanodrop: '① 검사', liquid_handler: '② 준비', quantstudio: '③ 측정' };
+
+const traceSeqSeen = new Set();
+let curveChart = null;
+let pollTimer = null;
+let lastState = null;
+
+// ---- 기기 카드 "작동" 연출 (서버 상태는 그대로, trace 이벤트만 보고 대시보드가 잠깐 덮어씀) ----
+const TOOL_ACTIVITY = {
+  read_nanodrop: { device: 'nanodrop', label: '측정 중', ms: 2000 },
+  run_liquid_handler: { device: 'liquid_handler', label: '작동 중', ms: 3000 },
+};
+const deviceActivity = { nanodrop: null, liquid_handler: null };
+const deviceActivityTimers = { nanodrop: null, liquid_handler: null };
+
+function triggerDeviceActivity(ev) {
+  if (ev.type !== 'tool_call' || ev.rejected) return;
+  const cfg = TOOL_ACTIVITY[ev.tool];
+  if (!cfg) return;
+  deviceActivity[cfg.device] = cfg.label;
+  if (deviceActivityTimers[cfg.device]) clearTimeout(deviceActivityTimers[cfg.device]);
+  deviceActivityTimers[cfg.device] = setTimeout(() => {
+    deviceActivity[cfg.device] = null;
+    deviceActivityTimers[cfg.device] = null;
+    if (lastState) renderDevices(lastState);
+  }, cfg.ms);
+  if (lastState) renderDevices(lastState);
+}
+
+function el(id) { return document.getElementById(id); }
+
+// ---- 기기 카드 ----
+function renderDevices(state) {
+  const wrap = el('devices');
+  wrap.innerHTML = '';
+  const keys = ['nanodrop', 'liquid_handler', 'quantstudio'];
+  let prevHadRole = false;
+  keys.forEach((key, i) => {
+    const d = state.devices[key];
+    const meta = DEVICE_META[key];
+    let sub;
+    if (key === 'nanodrop') {
+      sub = d.last_reading_count ? `마지막 측정: 샘플 ${d.last_reading_count}건` : '측정 기록 없음';
+    } else if (key === 'liquid_handler') {
+      sub = `시약 잔량 buffer ${d.reagent_ul.toFixed(1)} µL`;
+    } else {
+      sub = state.qpcr_run
+        ? `qPCR 사이클 ${state.qpcr_run.cycle} / ${state.qpcr_run.total_cycles}`
+        : (d.reserved ? '예약됨 · 런 대기' : '예약 안 됨');
+    }
+    const activity = deviceActivity[key]; // QuantStudio는 서버 상태만 따름(건드리지 않음)
+    const badgeClass = activity ? 'active' : d.status;
+    const badgeText = activity || (BADGE_LABEL[d.status] || d.status);
+    const role = DEVICE_ROLE[key];
+
+    if (i > 0 && role && prevHadRole) {
+      const arrow = document.createElement('span');
+      arrow.className = 'devices-arrow';
+      arrow.textContent = '→';
+      wrap.appendChild(arrow);
+    }
+
+    const card = document.createElement('div');
+    card.className = 'dev' + (activity ? ' active' : '');
+    card.innerHTML = `<div class="name">${meta.name}${role ? `<span class="role-chip">${role}</span>` : ''}</div>` +
+      `<span class="badge ${badgeClass}">${badgeText}</span>` +
+      `<div class="sub">${sub}</div>`;
+    wrap.appendChild(card);
+    prevHadRole = !!role;
+  });
+}
+
+// ---- 메인 뷰 모드 ----
+function computeMode(state) {
+  if (!state.qpcr_run) return 'plate';
+  return state.qpcr_run.running ? 'curves' : 'results';
+}
+
+function renderMain(state) {
+  const mode = computeMode(state);
+  el('viewPlate').style.display = mode === 'plate' ? 'block' : 'none';
+  el('viewCurves').style.display = mode === 'curves' ? 'block' : 'none';
+  el('viewResults').style.display = mode === 'results' ? 'block' : 'none';
+
+  if (mode === 'plate') {
+    el('mainTitle').textContent = '플레이트';
+    el('mainDetail').textContent = `${state.batch} · lot #${state.lot} · 샘플 12 × 3반복`;
+    renderPlate(state);
+  } else if (mode === 'curves') {
+    el('mainTitle').textContent = '증폭 곡선';
+    el('mainDetail').textContent = `사이클 ${state.qpcr_run.cycle} / ${state.qpcr_run.total_cycles}`;
+    renderCurves(state);
+  } else {
+    el('mainTitle').textContent = '결과표';
+    el('mainDetail').textContent = `측정 완료 · ${state.batch} · lot #${state.lot}`;
+    renderResults(state);
+  }
+}
+
+// ---- 플레이트 그리드 (A~H × 1~12, 실제 데이터는 A~C행만) ----
+function renderPlate(state) {
+  const wells = state.plate.wells;
+  let html = '<tr><th></th>';
+  for (let c = 1; c <= 12; c++) html += `<th>${c}</th>`;
+  html += '</tr>';
+  for (const r of 'ABCDEFGH') {
+    html += `<tr><th>${r}</th>`;
+    for (let c = 1; c <= 12; c++) {
+      const wellId = `${r}${c}`;
+      const w = wells[wellId];
+      let cls = '', txt = '';
+      if (w) {
+        if (w.display_hint) { cls = 'bad'; txt = '!'; }
+        else if (w.status === 'done') cls = 'done';
+        else if (w.status === 'filled') cls = 'filled';
+      }
+      html += `<td class="${cls}">${txt}</td>`;
+    }
+    html += '</tr>';
+  }
+  el('plateTable').innerHTML = html;
+}
+
+// ---- 결과표 (샘플별 3반복 상태) ----
+function renderResults(state) {
+  const wells = state.plate.wells;
+  const bySample = {};
+  for (const [wellId, w] of Object.entries(wells)) {
+    (bySample[w.sample_id] = bySample[w.sample_id] || {})[w.replicate] = { ...w, well: wellId };
+  }
+  const sampleIds = Object.keys(bySample).sort();
+  let html = '<tr><th>샘플</th><th class="rep">반복 A</th><th class="rep">반복 B</th><th class="rep">반복 C</th></tr>';
+  for (const sid of sampleIds) {
+    html += `<tr><th>${sid}</th>`;
+    for (const rep of [1, 2, 3]) {
+      const w = bySample[sid][rep];
+      if (!w || w.status === 'empty') { html += '<td class="empty">—</td>'; continue; } // 플레이트에 없음(QC 탈락)
+      const cqTxt = w.cq != null ? `Cq ${w.cq.toFixed(1)}` : '증폭 없음';
+      if (w.display_hint) html += `<td class="rep bad">${w.well} ⚠ ${cqTxt}</td>`;
+      else html += `<td class="rep ok">${w.well} ✓ ${cqTxt}</td>`;
+    }
+    html += '</tr>';
+  }
+  el('resultsTable').innerHTML = html;
+}
+
+// ---- 증폭 곡선 (결정 12: 시나리오 파일의 실제 형광값을 그대로 그린다.
+//      Agent가 MCP get_qpcr_curves로 받는 값과 같은 출처 — /state의 fluorescence 필드는
+//      대시보드 전용 사본일 뿐, 숫자 자체는 서버가 새로 만들지 않는다.) ----
+function buildCurveDatasets(state) {
+  const cycle = state.qpcr_run.cycle;
+  const labels = Array.from({ length: cycle }, (_, i) => i + 1);
+  const datasets = [];
+  for (const [wellId, w] of Object.entries(state.plate.wells)) {
+    if (w.status === 'empty' || !w.fluorescence || !w.fluorescence.length) continue; // 플레이트에 없는 well
+    const isBad = !!w.display_hint;
+    datasets.push({
+      label: wellId,
+      data: w.fluorescence,
+      borderColor: isBad ? '#d33' : 'rgba(120,120,120,.4)',
+      borderWidth: isBad ? 2.5 : 1,
+      pointRadius: 0, tension: 0.15, order: isBad ? 0 : 1,
+    });
+  }
+  return { labels, datasets };
+}
+
+function renderCurves(state) {
+  const cycle = state.qpcr_run.cycle;
+  if (cycle <= 0) {
+    el('curveEmpty').style.display = 'block';
+    el('curveWrap').style.display = 'none';
+    return;
+  }
+  el('curveEmpty').style.display = 'none';
+  el('curveWrap').style.display = 'block';
+  const { labels, datasets } = buildCurveDatasets(state);
+  if (!curveChart) {
+    const ctx = el('curveCanvas').getContext('2d');
+    curveChart = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        responsive: true, maintainAspectRatio: false, animation: false,
+        plugins: { legend: { display: false }, tooltip: { enabled: false } },
+        scales: {
+          x: { title: { display: true, text: '사이클' }, min: 0, max: state.qpcr_run.total_cycles },
+          y: { title: { display: true, text: '형광' }, min: 0, max: 1.1 },
+        },
+      },
+    });
+  } else {
+    curveChart.data.labels = labels;
+    curveChart.data.datasets = datasets;
+    curveChart.options.scales.x.max = state.qpcr_run.total_cycles;
+    curveChart.update('none');
+  }
+}
+
+// ---- Trace 타임라인 ----
+function traceIconAndClass(ev) {
+  if (ev.type === 'tool_call') return { icon: `🔧 Tool 호출 — ${ev.label}`, cls: ev.rejected ? 'rejected' : '' };
+  if (ev.type === 'user_prompt') return { icon: '💬 사용자 프롬프트', cls: 'user' };
+  if (ev.type === 'human_approval') {
+    return ev.status === 'pending'
+      ? { icon: '⏳ 사람 승인 — 대기중', cls: 'approval' }
+      : { icon: '✅ 사람 승인', cls: 'approval' };
+  }
+  return { icon: ev.type, cls: '' };
+}
+function traceBody(ev) {
+  if (ev.type === 'tool_call') {
+    return `<span class="tool">${ev.tool}</span> <span class="res">→ ${ev.result_summary}</span>`;
+  }
+  if (ev.type === 'user_prompt') return `"${ev.text}"`;
+  if (ev.type === 'human_approval') return `${ev.detail || ''}`;
+  return '';
+}
+function traceLi(ev) {
+  const { icon, cls } = traceIconAndClass(ev);
+  const li = document.createElement('li');
+  li.className = cls;
+  li.dataset.seq = ev.seq;
+  li.innerHTML = `<div class="t"><span>${icon}</span><span class="ts">${ev.time}</span></div>${traceBody(ev)}`;
+  return li;
+}
+function upsertTrace(ev) {
+  const list = el('traceList');
+  const existing = list.querySelector(`li[data-seq="${ev.seq}"]`);
+  if (existing) {
+    existing.replaceWith(traceLi(ev));
+    return;
+  }
+  traceSeqSeen.add(ev.seq);
+  list.insertBefore(traceLi(ev), list.firstChild);
+  el('traceEmpty').style.display = 'none';
+}
+function renderTraceInit(events) {
+  const list = el('traceList');
+  list.innerHTML = '';
+  traceSeqSeen.clear();
+  for (const ev of events) { // 이미 최신순
+    traceSeqSeen.add(ev.seq);
+    list.appendChild(traceLi(ev));
+  }
+  el('traceEmpty').style.display = events.length ? 'none' : 'block';
+}
+
+// ---- qPCR 런 중 자동 새로고침 (서버 계산은 경과시간 기반, 클라이언트는 폴링만) ----
+function ensurePolling(state) {
+  const shouldPoll = !!(state.qpcr_run && state.qpcr_run.running);
+  if (shouldPoll && !pollTimer) {
+    pollTimer = setInterval(() => fetchState(false), 1000);
+  } else if (!shouldPoll && pollTimer) {
+    clearInterval(pollTimer);
+    pollTimer = null;
+  }
+}
+
+// ---- 상태 적용 ----
+function applyState(state) {
+  lastState = state;
+  el('batchLabel').textContent = `${state.batch} · lot #${state.lot}`;
+  renderDevices(state);
+  renderMain(state);
+  ensurePolling(state);
+}
+
+async function fetchState(withTrace) {
+  const res = await fetch('/state');
+  const state = await res.json();
+  applyState(state);
+  if (withTrace) renderTraceInit(state.trace || []);
+}
+
+// ---- SSE ----
+function connect() {
+  const es = new EventSource('/events');
+  es.addEventListener('open', () => { el('connLabel').textContent = '● 실시간 연결됨'; el('connLabel').classList.remove('off'); });
+  es.addEventListener('error', () => { el('connLabel').textContent = '● 연결 끊김 — 재시도 중'; el('connLabel').classList.add('off'); });
+  es.addEventListener('state', (e) => applyState(JSON.parse(e.data)));
+  es.addEventListener('trace', (e) => {
+    const ev = JSON.parse(e.data);
+    upsertTrace(ev);
+    triggerDeviceActivity(ev);
+  });
+  es.addEventListener('trace_reset', () => {
+    renderTraceInit([]);
+    for (const key of Object.keys(deviceActivity)) {
+      if (deviceActivityTimers[key]) { clearTimeout(deviceActivityTimers[key]); deviceActivityTimers[key] = null; }
+      deviceActivity[key] = null;
+    }
+    if (lastState) renderDevices(lastState);
+  });
+}
+
+// ---- 프롬프트 모음 패널 (결정 26) ----
+let promptsLoaded = false;
+
+function escapeHtml(s) {
+  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+
+async function copyText(text, btn) {
+  try {
+    await navigator.clipboard.writeText(text);
+  } catch (e) {
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.position = 'fixed';
+    ta.style.opacity = '0';
+    document.body.appendChild(ta);
+    ta.select();
+    try { document.execCommand('copy'); } catch (e2) { /* 무시 */ }
+    document.body.removeChild(ta);
+  }
+  const orig = btn.textContent;
+  btn.textContent = '복사됨';
+  btn.classList.add('copied');
+  setTimeout(() => { btn.textContent = orig; btn.classList.remove('copied'); }, 1200);
+}
+
+function renderPrompts(stages) {
+  const body = el('promptsBody');
+  if (!stages || !stages.length) {
+    body.innerHTML = '<div class="prompts-empty">등록된 프롬프트가 없습니다.</div>';
+    return;
+  }
+  body.innerHTML = '';
+  for (const stage of stages) {
+    const section = document.createElement('div');
+    section.className = 'prompts-stage';
+    const heading = document.createElement('div');
+    heading.className = 'prompts-stage-name';
+    heading.textContent = stage.stage;
+    section.appendChild(heading);
+    for (const item of stage.items) {
+      const box = document.createElement('div');
+      box.className = 'prompt-item';
+      box.innerHTML =
+        `<div class="prompt-head">` +
+          `<div><div class="prompt-name">${escapeHtml(item.name)}</div>` +
+          (item.description ? `<div class="prompt-desc">${escapeHtml(item.description)}</div>` : '') +
+          `</div>` +
+          `<button class="prompt-copy">복사</button>` +
+        `</div>` +
+        `<div class="prompt-body">${escapeHtml(item.body)}</div>`;
+      box.querySelector('.prompt-copy').addEventListener('click', (e) => copyText(item.body, e.currentTarget));
+      section.appendChild(box);
+    }
+    body.appendChild(section);
+  }
+}
+
+async function loadPrompts() {
+  if (promptsLoaded) return;
+  const res = await fetch('/prompts');
+  const data = await res.json();
+  renderPrompts(data.stages || []);
+  promptsLoaded = true;
+}
+
+function closePrompts() {
+  el('promptsPanel').classList.remove('open');
+}
+
+el('promptsBtn').addEventListener('click', async () => {
+  const panel = el('promptsPanel');
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open')) await loadPrompts();
+});
+el('promptsCloseBtn').addEventListener('click', closePrompts);
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && el('promptsPanel').classList.contains('open')) closePrompts();
+});
+
+el('resetBtn').addEventListener('click', async () => {
+  if (!confirm('실험 상태를 초기화할까요? (발표 중 오클릭 방지)')) return;
+  await fetch('/admin/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
+  await fetchState(true); // trace_reset SSE가 늦게 와도 화면이 즉시 맞춰지도록
+});
+el('nextBatchBtn').addEventListener('click', async () => {
+  await fetch('/admin/next-batch', { method: 'POST' });
+  await fetchState(true);
+});
+
+fetchState(true);
+connect();
+</script>
+</body>
+</html>

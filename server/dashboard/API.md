@@ -15,7 +15,7 @@
   "lot": "2508",
   "devices": {
     "nanodrop": { "status": "idle", "last_reading_count": 12 },
-    "liquid_handler": { "status": "idle", "reagent_ul": 186.44, "reagent_ul_initial": 525.0 },
+    "liquid_handler": { "status": "idle", "reagent_ul": 186.44, "reagent_ul_initial": 525.0, "last_run_entries": 20 },
     "quantstudio": { "status": "busy", "reserved": true }
   },
   "plate": {
@@ -30,6 +30,11 @@
 }
 ```
 
+- `nanodrop.last_reading_count` / `liquid_handler.last_run_entries`: **지속 이력**(순간 연출과 별개).
+  `read_nanodrop`/`run_liquid_handler`가 성공할 때마다 갱신되고 다음 리셋 전까지 유지된다 —
+  대시보드의 잠깐(수 초) 켜지는 "측정 중"/"작동 중" 배지가 꺼진 뒤에도 카드 부제(예: "샘플 12개
+  측정됨", "작업 목록 20건 완료")로 남아, 강연 중 그 순간을 놓친 청중도 무슨 일이 있었는지 알 수
+  있게 한다. `/admin/reset`·`/admin/next-batch`로 `null`로 초기화된다.
 - `plate.wells`: 96-well 중 실제 쓰는 A~C행 × 1~12열(36 well)만 들어 있다. 열 = 샘플(S01~S12),
   행 A/B/C = 3반복. `status`: `empty` → `filled`(액체 핸들러 실행 후) → `done`(qPCR 런 완료 후).
 - `display_hint`: **MCP 도구 응답에는 절대 없는, 대시보드 전용 필드**다. Agent에게는 형광 숫자만

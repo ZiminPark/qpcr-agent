@@ -61,6 +61,7 @@ class LabState:
                 "status": "idle",
                 "reagent_ul": scenario["reagent_ul_initial"],
                 "reagent_ul_initial": scenario["reagent_ul_initial"],
+                "last_run_entries": None,  # 대시보드 부제용 지속 이력 — 마지막 성공 실행의 작업 목록 건수
             },
             "quantstudio": {"status": "idle", "reserved": False},
         }

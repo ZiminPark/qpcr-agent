@@ -87,15 +87,22 @@
   .trace { background:#fff; border:1px solid var(--line); border-radius:6px; padding:12px; }
   .trace-title { font-size:20px; margin:28px 0 8px; }
   .trace ol { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:10px; }
-  .trace li { padding:10px 12px; border:1px solid #eee; border-radius:6px; font-size:14px; line-height:1.5; color:#555; }
+  .trace li { padding:10px 12px; border:1px solid #eee; border-left-width:3px; border-radius:6px; font-size:14px; line-height:1.5; color:#555; }
   .trace .t { display:flex; justify-content:space-between; font-size:12px; font-weight:700; letter-spacing:.06em; color:var(--dim); text-transform:uppercase; margin-bottom:5px; }
   .trace .ts { font-weight:400; letter-spacing:0; font-variant-numeric:tabular-nums; }
   .trace .tool { font-family:ui-monospace,monospace; font-size:0.95em; background:#f0f0ec; padding:1px 6px; border-radius:4px; }
+  .trace .device-chip { display:inline-block; font-size:11px; font-weight:500; text-transform:none; letter-spacing:0; color:var(--dim); background:#f0f0ec; border-radius:9px; padding:1px 7px; margin-left:6px; vertical-align:1px; }
   .trace .res { color:var(--dim); font-size:0.88em; }
-  .trace li.user { background:#f2f6ff; border-radius:4px; }
-  .trace li.approval { background:#fffceb; border-radius:4px; }
-  .trace li.rejected { background:#fff2f2; border-color:#f0c9c9; }
+  .trace li.call { border-left-color: var(--fill); } /* 도구 호출 = 파랑 계열 */
+  .trace li.user { background:#f2f6ff; border-radius:4px; border-left-color: var(--line); } /* 사용자 프롬프트 = 회색 */
+  .trace li.approval { background:#fffceb; border-radius:4px; border-left-color: var(--busy); } /* 사람 승인 = 주황 계열 */
+  .trace li.rejected { background:#fff2f2; border-color:#f0c9c9; border-left-color: var(--bad); } /* 거부된 호출 = 빨강 */
   .trace li.rejected .res { color: var(--bad); font-weight: 600; }
+  @keyframes traceFlash {
+    from { box-shadow: inset 0 0 0 999px rgba(72,140,204,.14); }
+    to   { box-shadow: inset 0 0 0 999px rgba(72,140,204,0); }
+  }
+  .trace li.just-in { animation: traceFlash 1s ease-out; } /* 새 카드 도착 시 은은한 배경 페이드인 */
   .trace-empty { color: var(--dim); font-size: 14px; }
 </style>
 </head>
@@ -186,8 +193,8 @@ let lastState = null;
 
 // ---- 기기 카드 "작동" 연출 (서버 상태는 그대로, trace 이벤트만 보고 대시보드가 잠깐 덮어씀) ----
 const TOOL_ACTIVITY = {
-  read_nanodrop: { device: 'nanodrop', label: '측정 중', ms: 2000 },
-  run_liquid_handler: { device: 'liquid_handler', label: '작동 중', ms: 3000 },
+  read_nanodrop: { device: 'nanodrop', label: '측정 중', ms: 5000 },
+  run_liquid_handler: { device: 'liquid_handler', label: '작동 중', ms: 6000 },
 };
 const deviceActivity = { nanodrop: null, liquid_handler: null };
 const deviceActivityTimers = { nanodrop: null, liquid_handler: null };
@@ -219,9 +226,10 @@ function renderDevices(state) {
     const meta = DEVICE_META[key];
     let sub;
     if (key === 'nanodrop') {
-      sub = d.last_reading_count ? `마지막 측정: 샘플 ${d.last_reading_count}건` : '측정 기록 없음';
+      sub = d.last_reading_count ? `샘플 ${d.last_reading_count}개 측정됨` : '측정 기록 없음';
     } else if (key === 'liquid_handler') {
-      sub = `시약 잔량 buffer ${d.reagent_ul.toFixed(1)} µL`;
+      const reagentTxt = `시약 잔량 buffer ${d.reagent_ul.toFixed(1)} µL`;
+      sub = d.last_run_entries ? `작업 목록 ${d.last_run_entries}건 완료 · ${reagentTxt}` : reagentTxt;
     } else {
       sub = state.qpcr_run
         ? `qPCR 사이클 ${state.qpcr_run.cycle} / ${state.qpcr_run.total_cycles}`
@@ -377,15 +385,30 @@ function renderCurves(state) {
 }
 
 // ---- Trace 타임라인 ----
+// 카드에 붙는 기기 칩 — 어느 tool_call이 어느 기기 일인지(결정 15 카드형·크기 균일은 유지, 칩만 추가).
+const TOOL_DEVICE_LABEL = {
+  read_nanodrop: 'NanoDrop',
+  run_liquid_handler: '액체 핸들러',
+  reserve_quantstudio: 'QuantStudio',
+  start_qpcr: 'QuantStudio',
+  get_qpcr_curves: 'QuantStudio',
+};
+
 function traceIconAndClass(ev) {
-  if (ev.type === 'tool_call') return { icon: `🔧 Tool 호출 — ${ev.label}`, cls: ev.rejected ? 'rejected' : '' };
-  if (ev.type === 'user_prompt') return { icon: '💬 사용자 프롬프트', cls: 'user' };
+  if (ev.type === 'tool_call') {
+    return {
+      icon: `🔧 Tool 호출 — ${ev.label}`,
+      cls: ev.rejected ? 'rejected' : 'call',
+      device: TOOL_DEVICE_LABEL[ev.tool] || null,
+    };
+  }
+  if (ev.type === 'user_prompt') return { icon: '💬 사용자 프롬프트', cls: 'user', device: null };
   if (ev.type === 'human_approval') {
     return ev.status === 'pending'
-      ? { icon: '⏳ 사람 승인 — 대기중', cls: 'approval' }
-      : { icon: '✅ 사람 승인', cls: 'approval' };
+      ? { icon: '⏳ 사람 승인 — 대기중', cls: 'approval', device: null }
+      : { icon: '✅ 사람 승인', cls: 'approval', device: null };
   }
-  return { icon: ev.type, cls: '' };
+  return { icon: ev.type, cls: '', device: null };
 }
 function traceBody(ev) {
   if (ev.type === 'tool_call') {
@@ -396,11 +419,12 @@ function traceBody(ev) {
   return '';
 }
 function traceLi(ev) {
-  const { icon, cls } = traceIconAndClass(ev);
+  const { icon, cls, device } = traceIconAndClass(ev);
   const li = document.createElement('li');
   li.className = cls;
   li.dataset.seq = ev.seq;
-  li.innerHTML = `<div class="t"><span>${icon}</span><span class="ts">${ev.time}</span></div>${traceBody(ev)}`;
+  const deviceChip = device ? ` <span class="device-chip">${device}</span>` : '';
+  li.innerHTML = `<div class="t"><span>${icon}${deviceChip}</span><span class="ts">${ev.time}</span></div>${traceBody(ev)}`;
   return li;
 }
 function upsertTrace(ev) {
@@ -411,7 +435,9 @@ function upsertTrace(ev) {
     return;
   }
   traceSeqSeen.add(ev.seq);
-  list.insertBefore(traceLi(ev), list.firstChild);
+  const li = traceLi(ev);
+  li.classList.add('just-in'); // 방금 도착한 카드만 은은하게 페이드인(상태 갱신 시엔 재생 안 함)
+  list.insertBefore(li, list.firstChild);
   el('traceEmpty').style.display = 'none';
 }
 function renderTraceInit(events) {

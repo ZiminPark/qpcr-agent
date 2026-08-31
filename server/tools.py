@@ -97,6 +97,7 @@ def run_liquid_handler(state: LabState, worklist: list[dict[str, Any]]) -> dict:
 
     # 여기서부터는 전량 실행 (부분 실행 없음, 결정 16)
     state.devices["liquid_handler"]["reagent_ul"] = round(available - buffer_requested, 2)
+    state.devices["liquid_handler"]["last_run_entries"] = len(worklist)  # 대시보드 부제용 지속 이력
     filled_wells: list[str] = []
     for sample_id in sample_ids:
         for well_id in _find_sample_wells(state, sample_id):

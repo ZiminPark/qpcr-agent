@@ -15,11 +15,12 @@ from fastapi.responses import JSONResponse, RedirectResponse, Response, Streamin
 from fastapi.staticfiles import StaticFiles
 
 from .mcp_app import STAGE_TOOLSET, TOOLSET_APPS, TOOLSET_SERVERS
-from .state import TOOL_LABELS_KO, lab_state
+from .state import SCENARIOS_DIR, TOOL_LABELS_KO, lab_state
 
 PORT = 8000  # 결정 23: .mcp.json 8개가 참조하므로 설정화하지 않고 상수로 고정한다.
 DASHBOARD_DIR = Path(__file__).parent / "dashboard"
 STAGES_DIR = Path(__file__).parent.parent / "stages"
+RESOURCES_DIR = Path(__file__).parent.parent / "resources"
 
 
 @asynccontextmanager
@@ -60,6 +61,15 @@ def stage7_not_implemented() -> JSONResponse:
 # ---- admin (MCP로는 미노출, 결정 12) ----
 
 
+def _known_batch_names() -> set[str]:
+    """시나리오 파일이 실제로 존재하는 batch 이름 집합(허용 목록).
+
+    `f"{batch}.json"` 식 경로 조립 대신 이 집합과 정확히 일치하는지만 확인한다 — 경로
+    구분자·`..` 등이 섞인 값은 이 집합에 있을 수 없으므로 자연히 걸러진다.
+    """
+    return {p.stem for p in SCENARIOS_DIR.glob("*.json")}
+
+
 @app.post("/admin/reset")
 async def admin_reset(request: Request) -> dict:
     body = {}
@@ -67,7 +77,20 @@ async def admin_reset(request: Request) -> dict:
         body = await request.json()
     except Exception:
         pass
-    batch = (body or {}).get("batch", "week1")
+    # reset은 "현재 batch 초기화" 전용이다 — batch 전환은 /admin/switch-batch가 맡는다.
+    # 생략 시 현재 batch. 명시된 값이 현재 batch와 다르면 거부한다(결함 1 수정): 스냅샷 없이
+    # live batch를 갈아치우면 진행 상태가 조용히 사라지고, 이후 그 batch로 돌아갔을 때 과거에
+    # 남아있던 스냅샷이 예상 밖에 복원되는 혼란까지 생기기 때문이다.
+    requested = (body or {}).get("batch")
+    if requested and requested != lab_state.batch:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"reset은 현재 batch({lab_state.batch!r})만 초기화할 수 있습니다. "
+                f"다른 batch({requested!r})로 가려면 /admin/switch-batch를 쓰세요."
+            ),
+        )
+    batch = lab_state.batch
     async with lab_state.lock:
         lab_state.reset(batch)
     lab_state.broadcast_state()
@@ -82,6 +105,22 @@ async def admin_next_batch() -> dict:
     lab_state.broadcast_state()
     lab_state.broadcast_trace_reset()
     return {"ok": True, "batch": batch}
+
+
+@app.post("/admin/switch-batch")
+async def admin_switch_batch(request: Request) -> JSONResponse:
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    batch = (body or {}).get("batch")
+    if not batch or batch not in _known_batch_names():
+        raise HTTPException(status_code=400, detail=f"알 수 없는 batch: {batch!r}")
+    async with lab_state.lock:
+        lab_state.switch_batch(batch)
+    lab_state.broadcast_state()
+    lab_state.broadcast_trace_reset()
+    return JSONResponse({"ok": True, "batch": lab_state.batch})
 
 
 # ---- trace (hook -> POST /trace, 결정 13) ----
@@ -213,6 +252,21 @@ def get_prompts() -> dict:
         if items:
             stages.append({"stage": stage_dir.name, "items": items})
     return {"stages": stages}
+
+
+# ---- 실험 노트 (결정 29) ----
+#
+# 정본은 resources/lab_notebook.md 하나(stage3+가 CLAUDE.md에서 import). 여기서는 그 파일을
+# 읽어 대시보드 패널에 내려줄 뿐 별도 사본을 두지 않는다. /prompts와 같은 방식으로 요청마다
+# 새로 읽으므로 발표 중 파일을 고쳐도 바로 반영된다.
+
+
+@app.get("/labnote")
+def get_labnote() -> dict:
+    path = RESOURCES_DIR / "lab_notebook.md"
+    if not path.exists():
+        raise HTTPException(status_code=404, detail="resources/lab_notebook.md 가 없습니다")
+    return {"markdown": path.read_text(encoding="utf-8")}
 
 
 # ---- 상태/이벤트 (대시보드용) ----

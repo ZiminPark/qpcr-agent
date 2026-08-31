@@ -168,19 +168,26 @@ def check_stage0_csv(stage_dir: Path) -> None:
 
 
 def check_memory_files(stage_dir: Path, stage_name: str) -> None:
+    """lab_notebook.md는 resources/ 공통 리소스 하나(결정 29) — stage 사본은 없어야 한다."""
     claude_md = stage_dir / "CLAUDE.md"
     notebook = stage_dir / "lab_notebook.md"
     if not claude_md.exists():
         fail(f"{stage_name}/CLAUDE.md 가 없습니다 (결정 14)")
     else:
-        content = claude_md.read_text(encoding="utf-8").strip()
-        if content != "@lab_notebook.md":
+        content = claude_md.read_text(encoding="utf-8")
+        if "@../../resources/lab_notebook.md" not in content:
             fail(
-                f"{stage_name}/CLAUDE.md 는 '@lab_notebook.md' 한 줄 import여야 하는데 "
-                f"'{content}' 입니다"
+                f"{stage_name}/CLAUDE.md 에 '@../../resources/lab_notebook.md' import 줄이 "
+                "없습니다 (결정 29)"
             )
-    if not notebook.exists():
-        fail(f"{stage_name}/lab_notebook.md 가 없습니다 (결정 14, 21)")
+    if notebook.exists():
+        fail(
+            f"{stage_name}/lab_notebook.md 사본이 있습니다 — 정본은 resources/lab_notebook.md "
+            "하나여야 합니다 (결정 29, 파일 중복 스냅샷 원칙의 예외)"
+        )
+    resources_notebook = REPO_ROOT / "resources" / "lab_notebook.md"
+    if not resources_notebook.exists():
+        fail("resources/lab_notebook.md 가 없습니다 (결정 29)")
 
 
 def check_qc_reviewer(stage_dir: Path) -> None:

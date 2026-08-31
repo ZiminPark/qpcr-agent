@@ -6,7 +6,7 @@
 run:
 	uv run python -m server.main
 
-## 실험 상태를 처음(week1)으로 초기화
+## 실험 상태를 현재 주(batch)의 처음 상태로 초기화
 reset:
 	curl -X POST http://localhost:8000/admin/reset
 

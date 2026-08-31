@@ -7,6 +7,7 @@
 from __future__ import annotations
 
 import asyncio
+import copy
 import json
 import time
 from pathlib import Path
@@ -39,11 +40,59 @@ class LabState:
         self._lock = asyncio.Lock()
         self._subscribers: set[asyncio.Queue] = set()
         self._trace_seq = 0
+        # batch 이름 -> 그 batch를 떠날 때 저장한 상태 스냅샷(결정 28). 인메모리 전용,
+        # 파일 저장·난수 없음 — 결정론 유지.
+        self._batch_snapshots: dict[str, dict] = {}
         self.reset("week1")
+
+    # ---- batch 상태 스냅샷 (결정 28) ----
+
+    _SNAPSHOT_FIELDS = (
+        "batch",
+        "lot",
+        "samples",
+        "qpcr_config",
+        "plate_wells_data",
+        "qc_pass",
+        "devices",
+        "plate",
+        "last_worklist",
+        "qpcr_run",
+        "trace",
+        "_trace_seq",
+        "curves_seen_late",
+    )
+
+    def _capture(self) -> dict:
+        """현재 가변 상태 전부를 깊은 복사로 스냅샷한다(복원 후 원본 오염 방지)."""
+        return {field: copy.deepcopy(getattr(self, field)) for field in self._SNAPSHOT_FIELDS}
+
+    def _restore(self, snap: dict) -> None:
+        for field in self._SNAPSHOT_FIELDS:
+            setattr(self, field, copy.deepcopy(snap[field]))
+
+    def switch_batch(self, target: str) -> str:
+        """batch 전환(결정 28) — 방문한 적 있는 batch는 상태 복원, 처음 가는 batch는 신선하게 로드.
+
+        target이 현재 batch면 아무 것도 하지 않는다.
+        """
+        if target == self.batch:
+            return self.batch
+        self._batch_snapshots[self.batch] = self._capture()
+        snap = self._batch_snapshots.get(target)
+        if snap is not None:
+            self._restore(snap)
+        else:
+            self.reset(target)
+        return self.batch
 
     # ---- 초기화/배치 전환 (admin 전용, MCP로는 미노출) ----
 
     def reset(self, batch: str) -> None:
+        # "리셋 = 그 batch를 처음으로" — 저장된 진행 상태가 있으면 폐기한다(결정 28).
+        # __init__에서 reset()이 _batch_snapshots보다 먼저 불릴 일은 없지만(위에서 먼저
+        # 만들어둠) 호출 순서에 안전하도록 getattr로 가드한다.
+        getattr(self, "_batch_snapshots", {}).pop(batch, None)
         scenario = _load_scenario(batch)
         self.batch = scenario["batch"]
         self.lot = scenario["lot"]
@@ -84,10 +133,9 @@ class LabState:
         self.curves_seen_late = False
 
     def next_batch(self) -> str:
-        """다음 배치 투입 (결정 17) — week1 -> week2. MCP로는 미노출."""
+        """다음 배치 투입 (결정 17) — week1 <-> week2 토글. 상태 보존형 전환(결정 28)."""
         nxt = "week2" if self.batch == "week1" else "week1"
-        self.reset(nxt)
-        return self.batch
+        return self.switch_batch(nxt)
 
     # ---- trace ----
 

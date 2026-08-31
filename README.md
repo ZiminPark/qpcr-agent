@@ -16,6 +16,7 @@ server/             가상 실험실 서버 (FastAPI, 포트 8000 고정)
   scenarios/        데모에 쓰이는 고정 데이터 (week1.json, week2.json)
 stages/             stage별 실습 디렉터리 (stage0_chatbot ~ stage6_multiagent)
   각 디렉터리 = Claude Code 세션을 여는 곳 하나. .mcp.json, 권한 설정, 발표자 대사(슬래시 커맨드) 포함
+resources/          stage 간 공유하는 공통 자료 (lab_notebook.md — 실험 노트, stage3+가 참조)
 scripts/            stages/ 규격 검증 스크립트
 ```
 
@@ -29,7 +30,7 @@ scripts/            stages/ 규격 검증 스크립트
 make run          # = uv run python -m server.main
 ```
 
-서버는 포트 8000 하나로 고정되어 있고(MCP 엔드포인트 `/mcp/<stage이름>` + 대시보드를 함께 서빙), 실습이 끝날 때까지 재시작할 필요가 없습니다. 상태 조작은 admin 엔드포인트 2개(MCP로는 노출 안 됨)로 합니다. 실험 상태를 처음으로 되돌리려면:
+서버는 포트 8000 하나로 고정되어 있고(MCP 엔드포인트 `/mcp/<stage이름>` + 대시보드를 함께 서빙), 실습이 끝날 때까지 재시작할 필요가 없습니다. 상태 조작은 admin 엔드포인트로 합니다. 실험 상태를 **현재 주(batch)**의 처음 상태로 되돌리려면:
 
 ```bash
 make reset        # = curl -X POST http://localhost:8000/admin/reset
@@ -41,7 +42,9 @@ make reset        # = curl -X POST http://localhost:8000/admin/reset
 make next-batch   # = curl -X POST http://localhost:8000/admin/next-batch
 ```
 
-두 엔드포인트 모두 대시보드 헤더의 버튼(리셋 / 다음 배치 투입)으로도 실행할 수 있습니다.
+배치 전환은 상태 보존형입니다 — 이미 방문한 적 있는 주로 돌아가면(예: week2에서 다시 week1로) 그때까지의 진행 상태(플레이트, 시약 잔량, qPCR 결과 등)가 그대로 복원되고, 처음 가는 주는 시나리오에서 신선하게 로드됩니다. 리셋은 이와 달리 "그 주를 처음 상태로" 되돌리는 파괴적 동작입니다.
+
+두 엔드포인트 모두 대시보드 헤더의 버튼(리셋 / 배치 전환 토글)으로도 실행할 수 있습니다.
 
 ### 2. 대시보드 열기
 

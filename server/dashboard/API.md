@@ -113,13 +113,36 @@ stage 디렉터리 hook은 변형 없이 `curl -d @-`로 stdin(Claude Code가 �
 `hook_event_name`이 없을 때만 `type`을 본다. 🤖 "Agent 판단" 카드는 없다(결정 13) — 좌측
 터미널이 Agent의 뇌, 우측 대시보드가 실험실이라는 역할 분리를 지키기 위함.
 
+## GET /labnote (결정 29)
+
+실험 노트(`resources/lab_notebook.md`)를 헤더 아이콘 버튼 → 슬라이드오버 패널로 보여주기 위한
+엔드포인트. `GET /prompts`와 같은 방식으로 요청마다 파일을 새로 읽으므로, 발표 중 파일을 고쳐도
+바로 반영된다.
+
+```json
+{ "markdown": "# 김 연구원 실험 노트\n..." }
+```
+
+정본은 `resources/lab_notebook.md` 하나다 — stage3+ 디렉터리에는 더 이상 사본을 두지 않고,
+`CLAUDE.md`가 `@../../resources/lab_notebook.md`로 import한다(결정 14·21의 stage별 사본
+규격을 이 부분만 개정 — 파일 중복 스냅샷 원칙의 예외). 파일이 없으면 404.
+
 ## admin (MCP로는 노출 안 됨, 결정 12)
 
-- `POST /admin/reset` — body `{"batch": "week1"}` (생략 시 week1). 상태 전체 초기화.
-- `POST /admin/next-batch` — week1 ⇄ week2 전환("다음 배치 투입", 결정 17). week2에는 stage6
-  무인 완주용 이상 well ⓑ가 들어 있다.
+- `POST /admin/reset` — **현재 batch 초기화 전용**. body의 `batch`는 생략을 권장하며, 주더라도
+  현재 batch와 같아야 한다(다르면 400 — "batch 전환은 /admin/switch-batch를 쓰세요"). 현재
+  batch를 시나리오 초기값으로 되돌리고, 저장돼 있던 그 batch의 진행 상태 스냅샷도 폐기한다(결정
+  28 — "리셋 = 그 batch를 처음으로"). 대시보드 리셋 버튼은 body `{}`를 보내므로 week2에서
+  누르면 week2가 초기화된다.
+- `POST /admin/next-batch` — week1 ⇄ week2 토글("다음 배치 투입", 결정 17). 내부적으로
+  `switch-batch`와 동일하게 상태 보존형 전환이다(결정 28).
+- `POST /admin/switch-batch` — body `{"batch": "week1"|"week2"}`. **상태 보존형 batch
+  전환**(결정 28): 전환 직전 현재 batch의 상태(플레이트·시약 잔량·qPCR 결과·trace 포함)를
+  인메모리 스냅샷으로 저장하고, 대상 batch에 저장본이 있으면 복원, 없으면 시나리오에서 신선하게
+  로드한다. 시나리오 파일이 없는 batch명은 400.
 
-두 엔드포인트 모두 처리 후 `event: state`를 즉시 브로드캐스트하고, 이어서 `event: trace_reset`
-(빈 payload `{}`)도 브로드캐스트한다 — reset()이 trace 이력을 지우므로, 연결된 모든 대시보드가
-trace 타임라인을 함께 비워야 하기 때문이다. 클라이언트는 이 이벤트를 받으면 trace 목록을 통째로
-지운다(그다음 새 trace 카드부터 다시 쌓인다).
+세 엔드포인트 모두 처리 후 `event: state`를 즉시 브로드캐스트하고, 이어서 `event: trace_reset`
+도 브로드캐스트한다. trace 타임라인 자체는 batch별 스냅샷에 포함되어 함께 저장·복원된다(결정
+28) — 다만 SSE의 `event: state` payload에는 (기존과 동일하게) `trace` 필드가 없으므로,
+`trace_reset`을 받은 클라이언트는 화면을 비운 뒤 `GET /state`를 다시 호출해 그 batch의 trace
+이력을 채워야 한다(신선한 batch면 빈 채로 남는다).

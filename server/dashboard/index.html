@@ -12,7 +12,11 @@
   header { display:flex; align-items:center; height:48px; margin-bottom:14px; gap:10px; }
   header .left { display:flex; align-items:center; gap:10px; }
   header h1 { font-size: 22px; margin: 0; }
-  header .batch-chip { font-size:12px; font-weight:500; color:var(--dim); background:#f0f0ec; border-radius:9px; padding:2px 9px; }
+  /* batch 세그먼트 토글 (결정 28) — 전환은 파괴가 아니라 이동이므로 chip+버튼 대신 하나의 토글로 */
+  header .batch-toggle { display:flex; background:#f0f0ec; border-radius:9px; padding:2px; gap:2px; }
+  header .batch-seg { font-size:12px; font-weight:500; padding:3px 10px; border-radius:7px; border:none; background:transparent; color:var(--dim); cursor:pointer; }
+  header .batch-seg:hover { color:#222; }
+  header .batch-seg.active { background:#fff; color:#222; font-weight:600; box-shadow:0 1px 2px rgba(0,0,0,.1); }
   header .spacer { flex:1; }
   header .right { display:flex; align-items:center; gap:8px; }
   header .conn { font-size: 12px; color: var(--dim); }
@@ -23,18 +27,18 @@
   header .icon-btn { font-size: 16px; padding: 6px 10px; border-radius: 6px; border: 1px solid transparent; background: transparent; line-height: 1; color: var(--dim); cursor:pointer; }
   header .icon-btn:hover { background: #eee; }
 
-  /* 프롬프트 모음 패널 (결정 26) — 오른쪽 슬라이드오버, 뒤 대시보드를 가리지 않음 */
-  .prompts {
+  /* 우측 슬라이드오버 패널 공통 틀 (프롬프트 모음 결정 26 / 실험 노트 결정 29) — 뒤 대시보드를 가리지 않음 */
+  .prompts, .labnote {
     position: fixed; top: 0; right: 0; bottom: 0; width: 400px; max-width: 92vw;
     background: #fff; border-left: 1px solid var(--line); box-shadow: -6px 0 18px rgba(0,0,0,.12);
     padding: 14px 14px 20px; overflow-y: auto; z-index: 50;
     transform: translateX(100%); transition: transform .18s ease-out;
   }
-  .prompts.open { transform: translateX(0); }
-  .prompts-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
-  .prompts h2 { font-size:16px; margin:0; }
-  .prompts-close { font-size:16px; line-height:1; padding:4px 9px; border-radius:6px; border:1px solid var(--line); background:#fff; cursor:pointer; color:var(--dim); }
-  .prompts-close:hover { background:#eee; }
+  .prompts.open, .labnote.open { transform: translateX(0); }
+  .sidebar-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+  .prompts h2, .labnote h2 { font-size:16px; margin:0; }
+  .sidebar-close { font-size:16px; line-height:1; padding:4px 9px; border-radius:6px; border:1px solid var(--line); background:#fff; cursor:pointer; color:var(--dim); }
+  .sidebar-close:hover { background:#eee; }
   .prompts-stage { margin-bottom:14px; }
   .prompts-stage:last-child { margin-bottom:0; }
   .prompts-stage-name { font-size:14px; font-weight:700; color:var(--dim); margin-bottom:6px; text-transform:none; }
@@ -48,6 +52,17 @@
   .prompt-copy:hover { background:#eee; }
   .prompt-copy.copied { color:var(--ok); border-color:var(--ok); }
   .prompts-empty { color:var(--dim); font-size:14px; }
+
+  /* 실험 노트 패널 (결정 29) — 서버 GET /labnote(마크다운)를 초소형 변환으로 렌더 */
+  .labnote-body { font-size:14px; line-height:1.6; color:#333; }
+  .labnote-body .md-h1 { font-size:16px; font-weight:700; margin:14px 0 6px; }
+  .labnote-body .md-h1:first-child { margin-top:0; }
+  .labnote-body .md-h2 { font-size:13px; font-weight:700; color:var(--dim); margin:12px 0 4px; }
+  .labnote-body p { margin:0 0 8px; }
+  .labnote-body ul { margin:0 0 8px; padding-left:18px; }
+  .labnote-body li { margin-bottom:3px; }
+  .labnote-body strong { font-weight:700; }
+  .labnote-empty { color:var(--dim); font-size:14px; }
 
   .devices { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:10px; align-items:stretch; }
   .dev { flex:1; min-width:160px; background:#fff; border:1px solid var(--line); border-radius:6px; padding:10px 12px; }
@@ -111,24 +126,35 @@
   <header>
     <div class="left">
       <h1>🧪 가상 실험실</h1>
-      <span class="batch-chip" id="batchLabel">—</span>
+      <div class="batch-toggle" id="batchToggle" role="group" aria-label="배치 선택">
+        <button class="batch-seg" data-batch="week1">week1</button>
+        <button class="batch-seg" data-batch="week2">week2</button>
+      </div>
       <span class="conn" id="connLabel"></span>
     </div>
     <div class="spacer"></div>
     <div class="right">
-      <button class="admin-btn" id="nextBatchBtn">다음 배치 투입</button>
-      <button class="admin-btn" id="resetBtn">리셋</button>
+      <button class="admin-btn" id="resetBtn" title="현재 주를 처음 상태로">리셋</button>
       <span class="divider"></span>
+      <button class="icon-btn" id="labnoteBtn" aria-label="실험 노트">📓</button>
       <button class="icon-btn" id="promptsBtn" aria-label="프롬프트 모음">☰</button>
     </div>
   </header>
 
   <div class="prompts" id="promptsPanel">
-    <div class="prompts-head">
+    <div class="sidebar-head">
       <h2>프롬프트 모음</h2>
-      <button class="prompts-close" id="promptsCloseBtn" aria-label="닫기">×</button>
+      <button class="sidebar-close" id="promptsCloseBtn" aria-label="닫기">×</button>
     </div>
     <div id="promptsBody"></div>
+  </div>
+
+  <div class="labnote" id="labnotePanel">
+    <div class="sidebar-head">
+      <h2>실험 노트</h2>
+      <button class="sidebar-close" id="labnoteCloseBtn" aria-label="닫기">×</button>
+    </div>
+    <div class="labnote-body" id="labnoteBody"></div>
   </div>
 
   <div class="devices" id="devices"></div>
@@ -462,10 +488,17 @@ function ensurePolling(state) {
   }
 }
 
+// ---- batch 세그먼트 토글 (결정 28) ----
+function updateBatchToggle(batch) {
+  document.querySelectorAll('#batchToggle .batch-seg').forEach((btn) => {
+    btn.classList.toggle('active', btn.dataset.batch === batch);
+  });
+}
+
 // ---- 상태 적용 ----
 function applyState(state) {
   lastState = state;
-  el('batchLabel').textContent = state.batch;
+  updateBatchToggle(state.batch);
   renderDevices(state);
   renderMain(state);
   ensurePolling(state);
@@ -489,13 +522,14 @@ function connect() {
     upsertTrace(ev);
     triggerDeviceActivity(ev);
   });
-  es.addEventListener('trace_reset', () => {
-    renderTraceInit([]);
+  es.addEventListener('trace_reset', async () => {
     for (const key of Object.keys(deviceActivity)) {
       if (deviceActivityTimers[key]) { clearTimeout(deviceActivityTimers[key]); deviceActivityTimers[key] = null; }
       deviceActivity[key] = null;
     }
-    if (lastState) renderDevices(lastState);
+    // 상태 보존형 batch 전환(결정 28)에서는 trace_reset이 "비움"이 아니라 "다른 batch의 trace로
+    // 교체"일 수 있으니, 무조건 비우지 않고 /state를 다시 받아 통째로 다시 그린다.
+    await fetchState(true);
   });
 }
 
@@ -571,12 +605,65 @@ function closePrompts() {
 
 el('promptsBtn').addEventListener('click', async () => {
   const panel = el('promptsPanel');
+  closeLabnote(); // 프롬프트·실험 노트 패널은 동시에 열지 않는다
   panel.classList.toggle('open');
   if (panel.classList.contains('open')) await loadPrompts();
 });
 el('promptsCloseBtn').addEventListener('click', closePrompts);
+
+// ---- 실험 노트 패널 (결정 29) — GET /labnote를 열 때마다 새로 받아 초소형 마크다운 변환으로 표시 ----
+function renderMiniMarkdown(md) {
+  const lines = (md || '').replace(/\r\n/g, '\n').split('\n');
+  let html = '';
+  let inList = false;
+  const closeList = () => { if (inList) { html += '</ul>'; inList = false; } };
+  const inline = (s) => escapeHtml(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  for (const raw of lines) {
+    const line = raw.trim();
+    if (!line) { closeList(); continue; }
+    if (line.startsWith('## ')) { closeList(); html += `<div class="md-h2">${inline(line.slice(3))}</div>`; continue; }
+    if (line.startsWith('# ')) { closeList(); html += `<div class="md-h1">${inline(line.slice(2))}</div>`; continue; }
+    if (line.startsWith('- ') || line.startsWith('* ')) {
+      if (!inList) { html += '<ul>'; inList = true; }
+      html += `<li>${inline(line.slice(2))}</li>`;
+      continue;
+    }
+    closeList();
+    html += `<p>${inline(line)}</p>`;
+  }
+  closeList();
+  return html || '<div class="labnote-empty">노트가 비어 있습니다.</div>';
+}
+
+async function loadLabnote() {
+  const body = el('labnoteBody');
+  body.innerHTML = '<div class="labnote-empty">불러오는 중…</div>';
+  try {
+    const res = await fetch('/labnote');
+    if (!res.ok) throw new Error(`status ${res.status}`);
+    const data = await res.json();
+    body.innerHTML = renderMiniMarkdown(data.markdown);
+  } catch (e) {
+    body.innerHTML = '<div class="labnote-empty">노트를 불러오지 못했습니다.</div>';
+  }
+}
+
+function closeLabnote() {
+  el('labnotePanel').classList.remove('open');
+}
+
+el('labnoteBtn').addEventListener('click', async () => {
+  const panel = el('labnotePanel');
+  closePrompts(); // 프롬프트·실험 노트 패널은 동시에 열지 않는다
+  panel.classList.toggle('open');
+  if (panel.classList.contains('open')) await loadLabnote(); // 매번 새로 받아 발표 중 수정도 즉시 반영
+});
+el('labnoteCloseBtn').addEventListener('click', closeLabnote);
+
 document.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape' && el('promptsPanel').classList.contains('open')) closePrompts();
+  if (e.key !== 'Escape') return;
+  if (el('promptsPanel').classList.contains('open')) closePrompts();
+  if (el('labnotePanel').classList.contains('open')) closeLabnote();
 });
 
 el('resetBtn').addEventListener('click', async () => {
@@ -584,9 +671,16 @@ el('resetBtn').addEventListener('click', async () => {
   await fetch('/admin/reset', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' });
   await fetchState(true); // trace_reset SSE가 늦게 와도 화면이 즉시 맞춰지도록
 });
-el('nextBatchBtn').addEventListener('click', async () => {
-  await fetch('/admin/next-batch', { method: 'POST' });
-  await fetchState(true);
+document.querySelectorAll('#batchToggle .batch-seg').forEach((btn) => {
+  btn.addEventListener('click', async () => {
+    if (btn.classList.contains('active')) return; // 이미 보고 있는 batch — 확인 없이 조용히 무시
+    await fetch('/admin/switch-batch', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ batch: btn.dataset.batch }),
+    });
+    await fetchState(true); // 전환은 파괴가 아니라 이동 — 확인 다이얼로그 없음
+  });
 });
 
 fetchState(true);
